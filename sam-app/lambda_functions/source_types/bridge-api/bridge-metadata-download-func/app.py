@@ -1,0 +1,295 @@
+import psycopg2
+import boto3
+import json
+import os
+import requests
+# from helper import log_message, LogData, LogMessage
+from psycopg2.extras import execute_values
+import xml.etree.ElementTree as et
+import traceback
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# TODO -- logging to be changed...
+
+
+# Function to fetch secrets from AWS Secrets Manager
+def fetch_secrets(secret_name):
+    # Initialize AWS Secrets Manager client
+    client = boto3.client("secretsmanager")
+
+    # Retrieve secret value using the provided secret name
+    response = client.get_secret_value(SecretId=secret_name)
+
+    # Parse and return the secret as a dictionary
+    secret = json.loads(response["SecretString"])
+    return secret
+
+
+# Function to set up a PostgreSQL database connection
+def setup_db_connection(secret):
+    # Extract database connection parameters from the secret
+    db_user = secret["username"]
+    db_password = secret["password"]
+    db_host = secret["host"]
+    db_port = secret["port"]
+    db_name = secret["dbname"]
+
+    # Establish a connection to the PostgreSQL database
+    conn = psycopg2.connect(
+        dbname=db_name, user=db_user, password=db_password, host=db_host, port=db_port
+    )
+    return conn
+
+
+def creds_from_source_table(connection, cursor, sid):
+
+    creds = f"select id, name, auth->'loginUrl' as loginurl, auth->'password' as token from public.source where source_info::text ~* 'BRIDGE' and id in ({sid});"
+    # creds = '''select id,name,auth->'loginUrl' loginurl,auth->'password' token from public.source where source_info::text ~*'BRIDGE' and id  in ({sid});'''
+    cursor.execute(creds)
+    log_msg = {"source_id": sid, "row_count": cursor.rowcount, "Query": creds}
+    logger.info(log_msg)
+
+    source_creds = cursor.fetchall()
+    return source_creds
+
+
+def DownloadMetaData(metadata_url, token):
+    classList = []
+    list_dict = {item: [] for item in classList}
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = requests.get(url=metadata_url, headers=headers)
+
+    xml_content = resp.content
+    tree = et.ElementTree(et.fromstring(xml_content))
+    root = tree.getroot()
+    # logger.info(root,'ROOOT')
+    for all_tree in root:
+        for inner_tree in all_tree:
+            # print(inner_tree.tag)
+            if "Namespace" in inner_tree.attrib and (
+                inner_tree.attrib["Namespace"] == "ODataService"
+                or inner_tree.attrib["Namespace"] == "HVMLS.Models"
+            ):
+                for entity_type in inner_tree.findall(
+                    ".//{http://docs.oasis-open.org/odata/ns/edm}EntityType"
+                ):
+                    class_name = entity_type.attrib["Name"]
+                    classList.append(class_name)
+
+                    if class_name not in list_dict:
+                        list_dict[class_name] = []
+                    columns_name = entity_type.findall(".//{*}Property")
+
+                    for col in columns_name:
+                        col_names = col.attrib["Name"]
+                        list_dict[class_name].append(col_names)
+
+    return classList, list_dict, resp.status_code
+
+
+def metadata_insertion(
+    classList, list_dict, source_name, source_id, connection, cursor
+):
+    classmetadata_del_sql = (
+        "delete from dev.stage_class_metadata where source_id = '{}'".format(
+            str(source_id)
+        )
+    )
+    fieldmetadata_del_sql = (
+        "delete from dev.stage_field_metadata where source_id = '{}'".format(
+            str(source_id)
+        )
+    )
+    cursor.execute(classmetadata_del_sql)
+    cursor.execute(fieldmetadata_del_sql)
+    connection.commit()
+    for class_name in classList:
+        data = (
+            source_id,
+            source_name,
+            class_name,
+            class_name,
+        )  # Create a tuple with all the values
+        cursor.execute(
+            "INSERT INTO dev.stage_class_metadata (source_id, source_name, resource_name, class_name) VALUES (%s, %s, %s, %s)",
+            data,
+        )
+    connection.commit()
+    # Insertion in Field Metadata table
+    resource_prefix = "key_value"
+    for item1, item2 in zip(
+        classList, (list_dict.get(class_name) for class_name in classList)
+    ):
+        data_for_insert = [
+            (source_id, source_name, item1, item1, field_value, resource_prefix)
+            for field_value in item2
+        ]
+        insert_query = "INSERT INTO dev.stage_field_metadata (source_id, source_name, resource_name, class_name, long_name,key_value) VALUES %s"
+        execute_values(cursor, insert_query, data_for_insert)
+        connection.commit()
+
+    class_meta_proc = "call dev.scd_class_metadata('{}')".format(source_id)
+    cursor.execute(class_meta_proc)
+    connection.commit()
+
+    fields_meta_proc = "call dev.scd_fields_metadata_trestle('{}')".format(source_id)
+    cursor.execute(fields_meta_proc)
+    connection.commit()
+
+
+def renaming_cols(source_id, cursor, psycopg_connection):
+    renaming_query = """
+                      UPDATE dev.field_metadata
+                      SET system_name = long_name
+                      WHERE source_id = {}
+                  """.format(source_id)
+    cursor.execute(renaming_query)
+    psycopg_connection.commit()
+
+    long_names_query = f"""
+        SELECT id, long_name
+        FROM dev.field_metadata
+        WHERE source_id = {source_id}
+        AND length(long_name) > 63
+    """
+    cursor.execute(long_names_query)
+    log_msg = {
+        "source_id": source_id,
+        "Row_count": cursor.rowcount,
+        "Message": "get column name haveing length more then 63",
+    }
+    long_name_cols = cursor.fetchall()
+
+    col_dict = {id: col_names for id, col_names in long_name_cols}
+
+    transformed_col_dict = {}
+    for counter, (id, col_name) in enumerate(col_dict.items(), start=1):
+        renamed_cols = col_name.split("_")
+        processed_word = [word[0] if len(word) > 5 else word for word in renamed_cols]
+        transformed_word = "_".join(processed_word) + f"_{counter}"
+        transformed_col_dict[id] = transformed_word
+
+    update_renamed_long = f"""
+                        UPDATE dev.field_metadata
+                        SET renamed_long_name = long_name
+                        WHERE source_id = {source_id}
+    """
+    cursor.execute(update_renamed_long)
+    psycopg_connection.commit()
+
+    update_query = """
+    UPDATE dev.field_metadata
+    SET renamed_long_name = %s
+    WHERE id = %s AND source_id = %s
+    """
+
+    for id, transformed_name in transformed_col_dict.items():
+        cursor.execute(update_query, (transformed_name, id, source_id))
+
+    psycopg_connection.commit()
+
+
+def ddl_generation(source_id, connection, cursor):
+    constant_attribs = [
+        "pid serial4 NOT NULL primary key",
+        "source_id int4 NULL",
+        "batch_id int4 NULL",
+        "source_creation_date timestamptz NULL",
+        "source_last_update_date timestamptz NULL",
+        "y_creation_date timestamptz NULL",
+        "y_last_update_date timestamptz NULL",
+    ]
+    keywords_to_quote = ["Group", "Order"]
+    ps_tables = """select distinct class_name from dev.class_metadata where source_id = {} and download_flag = true order by class_name desc;""".format(
+        str(source_id)
+    )
+    cursor.execute(ps_tables)
+    ps_tables = cursor.fetchall()
+    ps_tables_name = [i[0] for i in ps_tables]
+    for each_table in ps_tables_name:
+        long_names = """select renamed_long_name from dev.field_metadata where source_id = {0} and resource_name = '{1}';""".format(
+            str(source_id), each_table
+        )
+        cursor.execute(long_names)
+        ddl_ = cursor.fetchall()
+        # ddl_names = [j[0] + " text NULL" for j in ddl_]
+        ddl_names = [
+            f'"{j[0]}" text NULL' if j[0] in keywords_to_quote else f"{j[0]} text NULL"
+            for j in ddl_
+        ]
+        final_names = constant_attribs + ddl_names
+        final_names = (
+            str(final_names).replace("[", "").replace("]", "").replace("'", "")
+        )
+        final_query = (
+            """CREATE TABLE IF NOT EXISTS idx_stage.ps_bridge_{0}_{2} ( {1} """.format(
+                each_table, final_names, source_id
+            )
+        )
+        final_query = final_query + ")"
+        # print(final_names)
+        cursor.execute(final_query)
+    connection.commit()
+
+
+# Lambda function handler
+def lambda_handler(event, context):
+
+    try:
+        rds_secret = os.environ.get("rdsDatabase")
+        listing_secret = os.environ.get("listingDatabase")
+        rds_secret = fetch_secrets(rds_secret)
+        listing_secret = fetch_secrets(listing_secret)
+        rds_conn = setup_db_connection(rds_secret)
+        listing_conn = setup_db_connection(listing_secret)
+        rds_cursor = rds_conn.cursor()
+        listing_cursor = listing_conn.cursor()
+
+        source_id = event["source_id"]
+        credential_list = creds_from_source_table(
+            listing_conn, listing_cursor, source_id
+        )
+
+        for credentials in credential_list:
+            source_id = credentials[0]
+            classList, list_dict, status_code = DownloadMetaData(
+                credentials[2], credentials[3]
+            )
+            metadata_insertion(
+                classList,
+                list_dict,
+                credentials[1],
+                credentials[0],
+                rds_conn,
+                rds_cursor,
+            )
+            renaming_cols(credentials[0], rds_cursor, rds_conn)
+
+            if event["ddl_generation"]:
+                ddl_generation(credentials[0], rds_conn, rds_cursor)
+
+            response_msg = {"Status Code:": status_code, "Source Id:": source_id}
+            logger.info(response_msg)
+
+        return response_msg
+
+    except Exception as e:
+        log_msg = {
+        "Error": str(e),
+        "Error At line": traceback.format_exc(),
+        "Event": event,
+        }
+        logger.error(str(log_msg))
+        return log_msg
+
+        
+
+    finally:
+        if rds_conn:
+            rds_conn.close()
+        if listing_conn:
+            listing_conn.close()

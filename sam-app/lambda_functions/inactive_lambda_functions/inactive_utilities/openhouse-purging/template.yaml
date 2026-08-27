@@ -1,0 +1,884 @@
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  securityGroup:
+    Type: String
+
+  subnet1:
+    Type: String
+
+  subnet2:
+    Type: String
+
+  listingDatabase:
+    Type: String
+
+  rdsDatabase:
+    Type: String
+
+  mlsLambdaFunctionRole:
+    Type: String
+
+Resources:
+  PurgeOldOpenHouseRecordsLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: purge-old-openhouse-records-func
+      Handler: app.lambda_handler
+      FunctionName: purge-old-openhouse-records-func
+      Description: "This Lambda function purges outdated open house records from the homelistings database to maintain data accuracy."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 128
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  PurgeOldOpenHouseRecordsLambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: PurgeOldOpenHouseRecordsLambdaFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${PurgeOldOpenHouseRecordsLambdaFunction}"
+      RetentionInDays: 90
+
+  # SparkInactiveOpenHouseDataDownloadFunction:
+  #   Type: AWS::Serverless::Function
+  #   Properties:
+  #     CodeUri: Spark_inactive-openhouse-download-func
+  #     Handler: app.lambda_handler
+  #     FunctionName: spark-inactive-openhouse-download-func
+  #     Description: "This lambda downloads all openhouse records from the source with filter OHstartdate > -1 day and stores then in our homelistings Database."
+  #     Runtime: python3.12
+  #     Timeout: 900
+  #     MemorySize: 1024
+  #     Role: !Ref mlsLambdaFunctionRole
+  #     VpcConfig:
+  #       SecurityGroupIds:
+  #         - !Ref securityGroup
+  #       SubnetIds:
+  #         - !Ref subnet1
+  #         - !Ref subnet2
+  #     Layers:
+  #       - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+  #       - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+  #     Environment:
+  #       Variables:
+  #         listingDatabase: !Ref listingDatabase
+  #         rdsDatabase: !Ref rdsDatabase
+  #         sqlExecLimit: 900000
+  # SparkInactiveOpenHouseDataFunctionLogGroup:
+  #   Type: AWS::Logs::LogGroup
+  #   DependsOn: SparkInactiveOpenHouseDataDownloadFunction
+  #   Properties:
+  #     LogGroupName: !Sub "/aws/lambda/${SparkInactiveOpenHouseDataDownloadFunction}"
+  #     RetentionInDays: 90
+
+  # TrestleAPIInactiveOpenHouseDataDownloadFunction:
+  #   Type: AWS::Serverless::Function
+  #   Properties:
+  #     CodeUri: TrestleAPI_inactive-openhouse-download-func
+  #     Handler: app.lambda_handler
+  #     FunctionName: TrestleAPI_inactive-openhouse-download-func
+  #     Description: "This lambda downloads all openhouse records from the source with filter OHstartdate > -1 day and stores then in our homelistings Database."
+  #     Runtime: python3.12
+  #     Timeout: 900
+  #     MemorySize: 1024
+  #     Role: !Ref mlsLambdaFunctionRole
+  #     VpcConfig:
+  #       SecurityGroupIds:
+  #         - !Ref securityGroup
+  #       SubnetIds:
+  #         - !Ref subnet1
+  #         - !Ref subnet2
+  #     Layers:
+  #       - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+  #       - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+  #     Environment:
+  #       Variables:
+  #         listingDatabase: !Ref listingDatabase
+  #         rdsDatabase: !Ref rdsDatabase
+  #         sqlExecLimit: 900000
+  # TrestleAPIInactiveOpenHouseDataFunctionLogGroup:
+  #   Type: AWS::Logs::LogGroup
+  #   DependsOn: TrestleAPIInactiveOpenHouseDataDownloadFunction
+  #   Properties:
+  #     LogGroupName: !Sub "/aws/lambda/${TrestleAPIInactiveOpenHouseDataDownloadFunction}"
+  #     RetentionInDays: 90
+
+
+  TrestleRetsInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TrestleRets_inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: trestlerets-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records from the source with filter OHstartdate > -1 day and stores then in our homelistings Database."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 5000
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          sqlExecLimit: 900000
+  TrestleRetsInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: TrestleRetsInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${TrestleRetsInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90
+
+  FlexmlsRetsInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: FlexmlsRets_inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: FlexmlsRets_inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records from the source with filter OHstartdate > -1 day and stores then in our homelistings Database."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 5000
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          sqlExecLimit: 900000
+  FlexmlsRetsInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: FlexmlsRetsInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${FlexmlsRetsInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90
+
+
+  # MlsGRIDInactiveOpenHouseDataDownloadFunction:
+  #   Type: AWS::Serverless::Function
+  #   Properties:
+  #     CodeUri: MlsGRID_inactive-openhouse-download-func
+  #     Handler: app.lambda_handler
+  #     FunctionName: MlsGRID_inactive-openhouse-download-func
+  #     Description: "This lambda downloads all openhouse records from the source with filter OHstartdate > -1 day and stores then in our homelistings Database."
+  #     Runtime: python3.12
+  #     Timeout: 900
+  #     MemorySize: 1024
+  #     Role: !Ref mlsLambdaFunctionRole
+  #     VpcConfig:
+  #       SecurityGroupIds:
+  #         - !Ref securityGroup
+  #       SubnetIds:
+  #         - !Ref subnet1
+  #         - !Ref subnet2
+  #     Layers:
+  #       - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+  #       - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+  #     Environment:
+  #       Variables:
+  #         listingDatabase: !Ref listingDatabase
+  #         rdsDatabase: !Ref rdsDatabase
+  #         sqlExecLimit: 900000
+  # MlsGRIDInactiveOpenHouseDataFunctionLogGroup:
+  #   Type: AWS::Logs::LogGroup
+  #   DependsOn: MlsGRIDInactiveOpenHouseDataDownloadFunction
+  #   Properties:
+  #     LogGroupName: !Sub "/aws/lambda/${MlsGRIDInactiveOpenHouseDataDownloadFunction}"
+  #     RetentionInDays: 90
+      
+  ParagonrelsApiInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ParagonrelsApi_inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: paragon-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records from the source with filter OHstartdate > -1 day and stores then in our homelistings Database."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          sqlExecLimit: 900000
+  ParagonrelsApiInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: ParagonrelsApiInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ParagonrelsApiInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90
+  
+
+  SourceReApiInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: sourcere-inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: sourcere-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records from the source with filter OHstartdate > -1 day and stores then in our homelistings Database."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          sqlExecLimit: 900000
+  SourceReApiInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: SourceReApiInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${SourceReApiInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90
+
+  # BridgeApiInactiveOpenHouseDataDownloadFunction:
+  #   Type: AWS::Serverless::Function
+  #   Properties:
+  #     CodeUri: Bridge_inactive-openhouse-download-func
+  #     Handler: app.lambda_handler
+  #     FunctionName: Bridge_inactive-openhouse-download-func
+  #     Description: "This lambda downloads all openhouse records from the source with filter OHstartdate > -1 day and stores then in our homelistings Database."
+  #     Runtime: python3.12
+  #     Timeout: 900
+  #     MemorySize: 1024
+  #     Role: !Ref mlsLambdaFunctionRole
+  #     VpcConfig:
+  #       SecurityGroupIds:
+  #         - !Ref securityGroup
+  #       SubnetIds:
+  #         - !Ref subnet1
+  #         - !Ref subnet2
+  #     Layers:
+  #       - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+  #       - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+  #     Environment:
+  #       Variables:
+  #         listingDatabase: !Ref listingDatabase
+  #         rdsDatabase: !Ref rdsDatabase
+  #         sqlExecLimit: 900000
+  # BridgeApiInactiveOpenHouseDataFunctionLogGroup:
+  #   Type: AWS::Logs::LogGroup
+  #   DependsOn: BridgeApiInactiveOpenHouseDataDownloadFunction
+  #   Properties:
+  #     LogGroupName: !Sub "/aws/lambda/${BridgeApiInactiveOpenHouseDataDownloadFunction}"
+  #     RetentionInDays: 90
+  
+  # MlsRouterApiInactiveOpenHouseDataDownloadFunction:
+  #   Type: AWS::Serverless::Function
+  #   Properties:
+  #     CodeUri: MlsRouter_inactive-openhouse-download-func
+  #     Handler: app.lambda_handler
+  #     FunctionName: mlsrouter-inactive-openhouse-download-func
+  #     Description: "This lambda downloads all openhouse records from the source with filter OHstartdate > -1 day and stores then in our homelistings Database."
+  #     Runtime: python3.12
+  #     Timeout: 900
+  #     MemorySize: 1024
+  #     Role: !Ref mlsLambdaFunctionRole
+  #     VpcConfig:
+  #       SecurityGroupIds:
+  #         - !Ref securityGroup
+  #       SubnetIds:
+  #         - !Ref subnet1
+  #         - !Ref subnet2
+  #     Layers:
+  #       - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+  #       - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+  #     Environment:
+  #       Variables:
+  #         listingDatabase: !Ref listingDatabase
+  #         rdsDatabase: !Ref rdsDatabase
+  #         sqlExecLimit: 900000
+  # MlsRouterApiInactiveOpenHouseDataFunctionLogGroup:
+  #   Type: AWS::Logs::LogGroup
+  #   DependsOn: MlsRouterApiInactiveOpenHouseDataDownloadFunction
+  #   Properties:
+  #     LogGroupName: !Sub "/aws/lambda/${MlsRouterApiInactiveOpenHouseDataDownloadFunction}"
+  #     RetentionInDays: 90
+
+
+  # DDFAPIInactiveOpenHouseDataDownloadFunction:
+  #   Type: AWS::Serverless::Function
+  #   Properties:
+  #     CodeUri: DDFAPI_inactive-openhouse-download-func
+  #     Handler: app.lambda_handler
+  #     FunctionName: DDFAPI_inactive-openhouse-download-func
+  #     Description: "This lambda downloads all openhouse records from the source with filter OHstartdate > -1 day and stores then in our homelistings Database."
+  #     Runtime: python3.12
+  #     Timeout: 900
+  #     MemorySize: 1024
+  #     Role: !Ref mlsLambdaFunctionRole
+  #     VpcConfig:
+  #       SecurityGroupIds:
+  #         - !Ref securityGroup
+  #       SubnetIds:
+  #         - !Ref subnet1
+  #         - !Ref subnet2
+  #     Layers:
+  #       - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+  #       - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+  #     Environment:
+  #       Variables:
+  #         listingDatabase: !Ref listingDatabase
+  #         rdsDatabase: !Ref rdsDatabase
+  #         sqlExecLimit: 900000
+  # DDFAPIInactiveOpenHouseDataFunctionLogGroup:
+  #   Type: AWS::Logs::LogGroup
+  #   DependsOn: DDFAPIInactiveOpenHouseDataDownloadFunction
+  #   Properties:
+  #     LogGroupName: !Sub "/aws/lambda/${DDFAPIInactiveOpenHouseDataDownloadFunction}"
+  #     RetentionInDays: 90
+  
+  ProptxInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: Proptx_inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: proptx-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records from the source with filter OHstartdate > -1 day and stores then in our homelistings Database."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 5000
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          sqlExecLimit: 900000
+  ProptxInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: ProptxInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ProptxInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90
+
+
+  MlsmatrixRETSInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mlsmatrix-rets-inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: mlsmatrix-rets-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records and inserts in homelistings for synchronization."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  MlsmatrixRETSInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: MlsmatrixRETSInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${MlsmatrixRETSInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90
+  
+  UnifiedRETSInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: unified-rets-inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: unified-rets-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records and inserts in homelistings for synchronization."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  UnifiedRETSInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: UnifiedRETSInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${UnifiedRETSInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90
+
+  SilvarRETSInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: silvar-rets-inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: silvar-rets-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records and inserts in homelistings for synchronization."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  SilvarRETSInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: SilvarRETSInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${SilvarRETSInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90
+
+  
+  NavicamlsRETSInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: navicamls-rets-inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: navicamls-rets-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records and inserts in homelistings for synchronization."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  NavicamlsRETSInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: NavicamlsRETSInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${NavicamlsRETSInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90
+  
+  ParagonRelsRETSInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: paragonrels-rets-inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: paragonrels-rets-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records and inserts in homelistings for synchronization."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  ParagonRelsRETSInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: ParagonRelsRETSInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ParagonRelsRETSInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90
+
+
+  GSMLSRETSInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      FunctionName: gsmls-rets-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records and inserts in homelistings for synchronization."
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      ImageUri: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/mls-lambda-images:gsmls-rets-inactive-openhouse-data-download-lambda-image"
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  GSMLSRETSInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: GSMLSRETSInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${GSMLSRETSInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90
+
+  RapattoniAPIInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: rapattoni-inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: rapattoni-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records and inserts in homelistings for synchronization."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  RapattoniAPIInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: RapattoniAPIInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${RapattoniAPIInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90
+      
+  BrightRetsInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: BrightRets_inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: bright-rets-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records from the source with filter OHstartdate > -1 day and stores then in our homelistings Database."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 5000
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          sqlExecLimit: 900000
+  BrightRetsInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: BrightRetsInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${BrightRetsInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90      
+
+  # ResoAPIInactiveOpenHouseDataDownloadFunction:
+  #   Type: AWS::Serverless::Function
+  #   Properties:
+  #     CodeUri: reso-inactive-openhouse-download-func
+  #     Handler: app.lambda_handler
+  #     FunctionName: reso-inactive-openhouse-download-func
+  #     Description: "This lambda downloads all openhouse records and inserts in homelistings for synchronization."
+  #     Runtime: python3.12
+  #     Timeout: 900
+  #     MemorySize: 1024
+  #     Role: !Ref mlsLambdaFunctionRole
+  #     VpcConfig:
+  #       SecurityGroupIds:
+  #         - !Ref securityGroup
+  #       SubnetIds:
+  #         - !Ref subnet1
+  #         - !Ref subnet2
+  #     Layers:
+  #       - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+  #       - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+  #     Environment:
+  #       Variables:
+  #         listingDatabase: !Ref listingDatabase
+  #         rdsDatabase: !Ref rdsDatabase
+  # ResoAPIInactiveOpenHouseDataFunctionLogGroup:
+  #   Type: AWS::Logs::LogGroup
+  #   DependsOn: ResoAPIInactiveOpenHouseDataDownloadFunction
+  #   Properties:
+  #     LogGroupName: !Sub "/aws/lambda/${ResoAPIInactiveOpenHouseDataDownloadFunction}"
+  #     RetentionInDays: 90
+  
+  RAPIInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: rapi-inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: rapi-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records and inserts in homelistings for synchronization."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  RAPIInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: RAPIInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${RAPIInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90
+
+  RapretsRetsInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: raprets-rets-inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: raprets-rets-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records and inserts in homelistings for synchronization."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  RapretsRetsInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: RapretsRetsInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${RapretsRetsInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90      
+
+  ConnectMLSInactiveOpenHouseDataDownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: connectmls-rets-inactive-openhouse-download-func
+      Handler: app.lambda_handler
+      FunctionName: connectmls-rets-inactive-openhouse-download-func
+      Description: "This lambda downloads all openhouse records and inserts in homelistings for synchronization."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  ConnectMLSInactiveOpenHouseDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: ConnectMLSInactiveOpenHouseDataDownloadFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ConnectMLSInactiveOpenHouseDataDownloadFunction}"
+      RetentionInDays: 90
+
+
+Outputs:
+  PurgeOldOpenHouseRecordsLambda:
+    Description: "PurgeOldOpenHouseRecordsLambda"
+    Value: !GetAtt PurgeOldOpenHouseRecordsLambdaFunction.Arn
+    
+  # SparkInactiveOpenHouseDataDownloadFunction:
+  #   Description: "SparkInactiveOpenHouseDataDownloadFunction" 
+  #   Value: !GetAtt SparkInactiveOpenHouseDataDownloadFunction.Arn
+    
+  # TrestleAPIInactiveOpenHouseDataDownloadFunction:
+  #   Description: "TrestleAPIInactiveOpenHouseDataDownloadFunction"  
+  #   Value: !GetAtt TrestleAPIInactiveOpenHouseDataDownloadFunction.Arn
+
+  TrestleRetsInactiveOpenHouseDataDownloadFunction:
+    Description: "TrestleRetsInactiveOpenHouseDataDownloadFunction"  
+    Value: !GetAtt TrestleRetsInactiveOpenHouseDataDownloadFunction.Arn
+
+  # MlsGRIDInactiveOpenHouseDataDownloadFunction:
+  #   Description: "MlsGRIDInactiveOpenHouseDataDownloadFunction" 
+  #   Value: !GetAtt MlsGRIDInactiveOpenHouseDataDownloadFunction.Arn
+    
+  # DDFAPIInactiveOpenHouseDataDownloadFunction:
+  #   Description: "DDFAPIInactiveOpenHouseDataDownloadFunction" 
+  #   Value: !GetAtt DDFAPIInactiveOpenHouseDataDownloadFunction.Arn
+
+  MlsmatrixRETSInactiveOpenHouseDataDownloadFunction:
+    Description: "MlsmatrixRETSInactiveOpenHouseDataDownloadFunction" 
+    Value: !GetAtt MlsmatrixRETSInactiveOpenHouseDataDownloadFunction.Arn
+  
+  ParagonRelsRETSInactiveOpenHouseDataDownloadFunction:
+    Description: "ParagonRelsRETSInactiveOpenHouseDataDownloadFunction" 
+    Value: !GetAtt ParagonRelsRETSInactiveOpenHouseDataDownloadFunction.Arn
+
+  UnifiedRETSInactiveOpenHouseDataDownloadFunction:
+    Description: "UnifiedRETSInactiveOpenHouseDataDownloadFunction" 
+    Value: !GetAtt UnifiedRETSInactiveOpenHouseDataDownloadFunction.Arn
+
+  SilvarRETSInactiveOpenHouseDataDownloadFunction:
+    Description: "SilvarRETSInactiveOpenHouseDataDownloadFunction" 
+    Value: !GetAtt SilvarRETSInactiveOpenHouseDataDownloadFunction.Arn
+
+  NavicamlsRETSInactiveOpenHouseDataDownloadFunction:
+    Description: "NavicamlsRETSInactiveOpenHouseDataDownloadFunction" 
+    Value: !GetAtt NavicamlsRETSInactiveOpenHouseDataDownloadFunction.Arn
+
+  GSMLSRETSInactiveOpenHouseDataDownloadFunction:
+    Description: "GSMLSRETSInactiveOpenHouseDataDownloadFunction" 
+    Value: !GetAtt GSMLSRETSInactiveOpenHouseDataDownloadFunction.Arn
+
+  RapattoniAPIInactiveOpenHouseDataDownloadFunction:
+    Description: "RapattoniAPIInactiveOpenHouseDataDownloadFunction" 
+    Value: !GetAtt RapattoniAPIInactiveOpenHouseDataDownloadFunction.Arn
+
+  # ResoAPIInactiveOpenHouseDataDownloadFunction:
+  #   Description: "ResoAPIInactiveOpenHouseDataDownloadFunction" 
+  #   Value: !GetAtt ResoAPIInactiveOpenHouseDataDownloadFunction.Arn
+
+  RAPIInactiveOpenHouseDataDownloadFunction:
+    Description: "RAPIInactiveOpenHouseDataDownloadFunction" 
+    Value: !GetAtt RAPIInactiveOpenHouseDataDownloadFunction.Arn
+
+  ParagonrelsApiInactiveOpenHouseDataDownloadFunction:
+    Description: "ParagonrelsApiInactiveOpenHouseDataDownloadFunction"
+    Value: !GetAtt ParagonrelsApiInactiveOpenHouseDataDownloadFunction.Arn
+
+  SourceReApiInactiveOpenHouseDataDownloadFunction:
+    Description: "SourceReApiInactiveOpenHouseDataDownloadFunction"
+    Value: !GetAtt SourceReApiInactiveOpenHouseDataDownloadFunction.Arn
+  
+  # BridgeApiInactiveOpenHouseDataDownloadFunction:
+  #   Description: "BridgeApiInactiveOpenHouseDataDownloadFunction"
+  #   Value: !GetAtt BridgeApiInactiveOpenHouseDataDownloadFunction.Arn
+  
+  # MlsRouterApiInactiveOpenHouseDataDownloadFunction:
+  #   Description: "MlsRouterApiInactiveOpenHouseDataDownloadFunction"
+  #   Value: !GetAtt MlsRouterApiInactiveOpenHouseDataDownloadFunction.Arn
+
+
+  FlexmlsRetsInactiveOpenHouseDataDownloadFunction:
+    Description: "FlexmlsRetsInactiveOpenHouseDataDownloadFunction"  
+    Value: !GetAtt FlexmlsRetsInactiveOpenHouseDataDownloadFunction.Arn
+
+
+  BrightRetsInactiveOpenHouseDataDownloadFunction:
+    Description: "BrightRetsInactiveOpenHouseDataDownloadFunction"  
+    Value: !GetAtt BrightRetsInactiveOpenHouseDataDownloadFunction.Arn
+    
+  
+  ProptxInactiveOpenHouseDataDownloadFunction:
+    Description: "ProptxInactiveOpenHouseDataDownloadFunction" 
+    Value: !GetAtt ProptxInactiveOpenHouseDataDownloadFunction.Arn
+
+  RapretsRetsInactiveOpenHouseDataDownloadFunction:
+    Description: "RapretsRetsInactiveOpenHouseDataDownloadFunction" 
+    Value: !GetAtt RapretsRetsInactiveOpenHouseDataDownloadFunction.Arn
+
+  ConnectMLSInactiveOpenHouseDataDownloadFunction:
+    Description: "ConnectMLSInactiveOpenHouseDataDownloadFunction" 
+    Value: !GetAtt ConnectMLSInactiveOpenHouseDataDownloadFunction.Arn

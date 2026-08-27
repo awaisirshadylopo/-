@@ -1,0 +1,187 @@
+# ==============================================================================
+# File: bridge-api -> template.yaml
+# Description: Creation of Bridge API Specific Lambda Functions
+# ==============================================================================
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  securityGroup:
+    Type: String
+
+  subnet1:
+    Type: String
+
+  subnet2:
+    Type: String
+
+  listingDatabase:
+    Type: String
+
+  rdsDatabase:
+    Type: String
+
+  mlsLambdaFunctionRole:
+    Type: String
+
+
+Resources:
+  BridgeActiveDataDownloadLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: bridge-active-data-download-func
+      Handler: app.lambda_handler
+      FunctionName: bridge-active-data-download-func
+      Description: "This lambda fetches data from source and dumps into DB"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          bucket_name: !Sub idx-data-lake-${AWS::AccountId}-${AWS::Region}
+
+  BridgeActiveDataDownloadLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${BridgeActiveDataDownloadLambdaFunction}"
+      RetentionInDays: 90
+
+  BridgeInactiveDataDownloadLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: bridge-inactive-data-download-func
+      Handler: app.lambda_handler
+      FunctionName: bridge-inactive-data-download-func
+      Description: "This lambda fetches all active data from source and dumps into DB"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  BridgeInactiveDataDownloadLambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: BridgeInactiveDataDownloadLambdaFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${BridgeInactiveDataDownloadLambdaFunction}"
+      RetentionInDays: 90
+
+  BridgeOpenHouseDownloadUtilityLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: bridge-openhouse-download-utility-func
+      Handler: app.lambda_handler
+      # FunctionName: bridge-openhouse-download-utility-func
+      FunctionName: bridge-inactive-openhouse-download-func
+      Description: "This lambda fetches valid openhouse records from source and dumps into DB"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  BridgeOpenHouseDownloadUtilityLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${BridgeOpenHouseDownloadUtilityLambdaFunction}"
+      RetentionInDays: 90
+    
+  BridgeMissingSoldDatePriceUtilityLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: bridge-missing-sold-date-price-utility-func
+      Handler: app.lambda_handler
+      # FunctionName: bridge-missing-sold-date-price-utility-func
+      FunctionName: bridge-missing-sold-date-utility-func
+      Description: "This lambda fetches sold date and sold price from source and updates in DB where listing_p_sold records have null sold_date or sold_price"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  BridgeMissingSoldDatePriceUtilityLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${BridgeMissingSoldDatePriceUtilityLambdaFunction}"
+      RetentionInDays: 90
+
+  BridgeMetadataDownloadLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: bridge-metadata-download-func
+      Handler: app.lambda_handler
+      FunctionName: bridge-metadata-download-func
+      Description: "This lambda fetches metadata from source and dumps into metadata tables"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  BridgeMetadataDownloadLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${BridgeMetadataDownloadLambdaFunction}"
+      RetentionInDays: 90

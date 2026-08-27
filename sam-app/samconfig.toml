@@ -1,0 +1,30 @@
+version = 0.1
+
+[prod.deploy.parameters]
+stack_name = "sam-serverless-app-prod"
+resolve_s3 = true
+s3_prefix = "sam-serverless-app-prod"
+region = "us-west-2"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
+parameter_overrides = "securityGroup=\"sg-027ce5e13d4d3aa7b\" subnet1=\"subnet-04f10a1e1b08567d5\" subnet2=\"subnet-03d320186e49e6ea8\" listingDatabase=\"ylopo/listing/db/prod\" rdsDatabase=\"ylopo/rds/db/prod\""
+image_repositories = []
+
+[dev.deploy.parameters]
+stack_name = "sam-dev-app-run"
+resolve_s3 = true
+s3_prefix = "sam-dev-app-run"
+region = "us-west-2"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
+parameter_overrides = "securityGroup=\"sg-0234d8d9808b88d36\" subnet1=\"subnet-0a4e9caa19b3244d0\" subnet2=\"subnet-01f646a4f626f6e8d\" listingDatabase=\"ylopo/listing/db/prod\" rdsDatabase=\"ylopo/rds/db/prod\""
+image_repositories = []
+
+[default]
+stack_name = "sam-dev-app-run"
+resolve_s3 = true
+s3_prefix = "sam-dev-app-run"
+region = "us-west-2"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
+parameter_overrides = "securityGroup=\"sg-0234d8d9808b88d36\" subnet1=\"subnet-0a4e9caa19b3244d0\" subnet2=\"subnet-01f646a4f626f6e8d\" listingDatabase=\"ylopo/listing/db/prod\" rdsDatabase=\"ylopo/rds/db/prod\""
+image_repositories = []

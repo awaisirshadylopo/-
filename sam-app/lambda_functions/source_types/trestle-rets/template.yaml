@@ -1,0 +1,90 @@
+# ==============================================================================
+# File: trestle-rets -> template.yaml
+# Description: Creation of Trestle RETS Specific Lambda Functions
+# ==============================================================================
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  securityGroup:
+    Type: String
+
+  subnet1:
+    Type: String
+
+  subnet2:
+    Type: String
+
+  listingDatabase:
+    Type: String
+
+  rdsDatabase:
+    Type: String
+
+  mlsLambdaFunctionRole:
+    Type: String
+
+
+Resources:
+  TrestleRETSInactiveDataDownloadLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: trestle-rets-inactive-data-download-func
+      Handler: app.lambda_handler
+      FunctionName: trestlerets-inactive-data-download-func
+      Description: "This lambda fetches all active data from source and dumps into DB"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  TrestleRETSInactiveDataDownloadLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${TrestleRETSInactiveDataDownloadLambdaFunction}"
+      RetentionInDays: 90
+
+  TrestleRETSMetadataDownloadUtilityLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: trestle-rets-metadata-download-func
+      Handler: app.lambda_handler
+      FunctionName: trestle-rets-metadata-download-func
+      Description: "This lambda fetches metadata records from source and dumps into DB"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  TrestleRETSMetadataDownloadUtilityLambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${TrestleRETSMetadataDownloadUtilityLambdaFunction}"
+      RetentionInDays: 90

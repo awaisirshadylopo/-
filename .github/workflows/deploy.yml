@@ -1,0 +1,28 @@
+name: Build and Publish App
+on:
+  workflow_dispatch:
+    inputs: 
+      environment:
+        description: 'Environment to deploy to'
+        type: choice
+        required: true
+        options:
+          - 'dev'
+          - 'prod'
+      package_name: 
+        type: choice
+        description: Package name to deploy
+        required: true
+        options:
+          - sam-app
+run-name: Deploy ${{ inputs.package_name }} to ${{ inputs.environment }}
+
+jobs:
+  build-and-deploy-sam-app:
+    name: Build and Deploy SAM
+    uses: Ylopo/ylopo-github-actions-workflows/.github/workflows/deploy-sam-apps.yml@v4
+    secrets: inherit
+    with:
+      environment: ${{ github.event.inputs.environment }}
+      package_name: ${{ github.event.inputs.package_name }}
+      deploy_rest_api: false

@@ -1,0 +1,344 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Locking Lambda",
+  "States": {
+    "Locking Lambda": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-inactive-locking-func:$LATEST"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Creating Multiple Iteration"
+    },
+    "Creating Multiple Iteration": {
+      "Type": "Map",
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "DISTRIBUTED",
+          "ExecutionType": "STANDARD"
+        },
+        "StartAt": "Validation Lambda",
+        "States": {
+          "Validation Lambda": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "OutputPath": "$.Payload",
+            "Parameters": {
+              "Payload.$": "$",
+              "FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:spark-inactive-validation-func:$LATEST"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "Lambda.ServiceException",
+                  "Lambda.AWSLambdaException",
+                  "Lambda.SdkClientException",
+                  "Lambda.TooManyRequestsException"
+                ],
+                "IntervalSeconds": 1,
+                "MaxAttempts": 3,
+                "BackoffRate": 2
+              }
+            ],
+            "Catch": [
+              {
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
+                "Next": "Executing Rest of Failed Flow",
+                "ResultPath": "$.Payload"
+              }
+            ],
+            "Next": "Filtering Failed Validation"
+          },
+          "Filtering Failed Validation": {
+            "Type": "Choice",
+            "Choices": [
+              {
+                "Variable": "$.in-active-status",
+                "BooleanEquals": false,
+                "Next": "Executing Rest of Failed Flow"
+              }
+            ],
+            "Default": "Data Downloading Lambda"
+          },
+          "Filtering Failed Downloads": {
+            "Type": "Choice",
+            "Choices": [
+              {
+                "Variable": "$.download_status",
+                "BooleanEquals": false,
+                "Next": "Executing Rest of Failed Flow"
+              },
+              {
+                "And": [
+                  {
+                    "Variable": "$.break_loop",
+                    "IsPresent": false
+                  },
+                  {
+                    "Variable": "$.download_status",
+                    "BooleanEquals": true
+                  }
+                ],
+                "Next": "Prestage to Generic Mappings"
+              },
+              {
+                "And": [
+                  {
+                    "Variable": "$.break_loop",
+                    "BooleanEquals": false
+                  },
+                  {
+                    "Variable": "$.download_status",
+                    "BooleanEquals": true
+                  }
+                ],
+                "Next": "Data Downloading Lambda"
+              }
+            ],
+            "Default": "Prestage to Generic Mappings"
+          },
+          "Executing Rest of Failed Flow": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "OutputPath": "$.Payload",
+            "Parameters": {
+              "Payload.$": "$",
+              "FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-inactive-unlocking-func:$LATEST"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "Lambda.ServiceException",
+                  "Lambda.AWSLambdaException",
+                  "Lambda.SdkClientException",
+                  "Lambda.TooManyRequestsException"
+                ],
+                "IntervalSeconds": 1,
+                "MaxAttempts": 3,
+                "BackoffRate": 2
+              }
+            ],
+            "End": true
+          },
+          "Prestage to Generic Mappings": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "OutputPath": "$.Payload",
+            "Parameters": {
+              "Payload.$": "$",
+              "FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-inactive-mapping-func:$LATEST"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "Lambda.ServiceException",
+                  "Lambda.AWSLambdaException",
+                  "Lambda.SdkClientException",
+                  "Lambda.TooManyRequestsException"
+                ],
+                "IntervalSeconds": 1,
+                "MaxAttempts": 3,
+                "BackoffRate": 2
+              }
+            ],
+            "Catch": [
+              {
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
+                "Next": "Executing Rest of Failed Flow",
+                "ResultPath": "$.Payload"
+              }
+            ],
+            "Next": "Fetch OpenHouse From -1 Day"
+          },
+          "Fetch OpenHouse From -1 Day": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "OutputPath": "$.Payload",
+            "Parameters": {
+              "Payload.$": "$",
+              "FunctionName.$": "States.Format('arn:aws:lambda:${awsRegion}:${awsAccountId}:function:{}-inactive-openhouse-download-func:$LATEST', $.source_info.func_name)"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "Lambda.ServiceException",
+                  "Lambda.AWSLambdaException",
+                  "Lambda.SdkClientException",
+                  "Lambda.TooManyRequestsException"
+                ],
+                "IntervalSeconds": 1,
+                "MaxAttempts": 3,
+                "BackoffRate": 2,
+                "JitterStrategy": "FULL"
+              }
+            ],
+            "Next": "Fetch OpenHouse Filter",
+            "Catch": [
+              {
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
+                "Next": "Executing Rest of Failed Flow",
+                "ResultPath": "$.Payload"
+              }
+            ]
+          },
+          "Fetch OpenHouse Filter": {
+            "Type": "Choice",
+            "Choices": [
+              {
+                "Next": "Executing Rest of Failed Flow",
+                "Not": {
+                  "Variable": "$.success",
+                  "BooleanEquals": true
+                }
+              }
+            ],
+            "Default": "Purge Old Openhouse Records"
+          },
+          "Purge Old Openhouse Records": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "OutputPath": "$.Payload",
+            "Parameters": {
+              "Payload.$": "$",
+              "FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:purge-old-openhouse-records-func:$LATEST"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "Lambda.ServiceException",
+                  "Lambda.AWSLambdaException",
+                  "Lambda.SdkClientException",
+                  "Lambda.TooManyRequestsException"
+                ],
+                "IntervalSeconds": 1,
+                "MaxAttempts": 3,
+                "BackoffRate": 2
+              }
+            ],
+            "Catch": [
+              {
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
+                "Next": "Executing Rest of Failed Flow",
+                "ResultPath": "$.Payload"
+              }
+            ],
+            "Next": "Missing Sold Price Sold Date"
+          },
+          "Missing Sold Price Sold Date": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "OutputPath": "$.Payload",
+            "Parameters": {
+              "Payload.$": "$",
+              "FunctionName.$": "States.Format('arn:aws:lambda:${awsRegion}:${awsAccountId}:function:{}-missing-sold-date-utility-func:$LATEST', $.source_info.func_name)"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "Lambda.ServiceException",
+                  "Lambda.AWSLambdaException",
+                  "Lambda.SdkClientException",
+                  "Lambda.TooManyRequestsException"
+                ],
+                "IntervalSeconds": 1,
+                "MaxAttempts": 3,
+                "BackoffRate": 2
+              }
+            ],
+            "Catch": [
+              {
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
+                "Next": "Executing Rest of Failed Flow",
+                "ResultPath": "$.Payload"
+              }
+            ],
+            "Next": "Unlocking Rest of the flow ids"
+          },
+          "Unlocking Rest of the flow ids": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "OutputPath": "$.Payload",
+            "Parameters": {
+              "Payload.$": "$",
+              "FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-inactive-unlocking-func:$LATEST"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "Lambda.ServiceException",
+                  "Lambda.AWSLambdaException",
+                  "Lambda.SdkClientException",
+                  "Lambda.TooManyRequestsException"
+                ],
+                "IntervalSeconds": 1,
+                "MaxAttempts": 3,
+                "BackoffRate": 2
+              }
+            ],
+            "End": true
+          },
+          "Data Downloading Lambda": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "OutputPath": "$.Payload",
+            "Parameters": {
+              "Payload.$": "$",
+              "FunctionName.$": "States.Format('arn:aws:lambda:${awsRegion}:${awsAccountId}:function:{}-inactive-data-download-func:$LATEST', $.source_info.func_name)"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": [
+                  "Lambda.ServiceException",
+                  "Lambda.AWSLambdaException",
+                  "Lambda.SdkClientException",
+                  "Lambda.TooManyRequestsException"
+                ],
+                "IntervalSeconds": 1,
+                "MaxAttempts": 3,
+                "BackoffRate": 2
+              }
+            ],
+            "Catch": [
+              {
+                "ErrorEquals": [
+                  "States.ALL"
+                ],
+                "Next": "Executing Rest of Failed Flow",
+                "ResultPath": "$.Payload"
+              }
+            ],
+            "Next": "Filtering Failed Downloads"
+          }
+        }
+      },
+      "End": true,
+      "Label": "CreatingMultipleIteration",
+      "MaxConcurrency": 1000
+    }
+  }
+}

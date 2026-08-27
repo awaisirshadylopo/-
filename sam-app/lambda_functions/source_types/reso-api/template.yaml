@@ -1,0 +1,155 @@
+# ==============================================================================
+# File: reso-api -> template.yaml
+# Description: Creation of Reso API Specific Lambda Functions
+# ==============================================================================
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  securityGroup:
+    Type: String
+
+  subnet1:
+    Type: String
+
+  subnet2:
+    Type: String
+
+  listingDatabase:
+    Type: String
+
+  rdsDatabase:
+    Type: String
+
+  mlsLambdaFunctionRole:
+    Type: String
+
+
+Resources:
+  ResoActiveDataDownloadLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: reso-active-data-download-func
+      Handler: app.lambda_handler
+      FunctionName: reso-active-data-download-func
+      Description: "This lambda fetches data from source and dumps into DB"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          bucket_name: !Sub idx-data-lake-${AWS::AccountId}-${AWS::Region}
+          sqlExecLimit: 900000
+
+  ResoActiveDataDownloadLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ResoActiveDataDownloadLambdaFunction}"
+      RetentionInDays: 90
+
+  ResoInactiveDataDownloadLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: reso-inactive-data-download-func
+      Handler: app.lambda_handler
+      FunctionName: reso-inactive-data-download-func
+      Description: "This lambda fetches all active data from source and dumps into DB"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  ResoInactiveDataDownloadLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ResoInactiveDataDownloadLambdaFunction}"
+      RetentionInDays: 90
+
+  ResoOpenHouseDownloadUtilityLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: reso-openhouse-download-utility-func
+      Handler: app.lambda_handler
+      # FunctionName: reso-openhouse-download-utility-func
+      FunctionName: reso-inactive-openhouse-download-func
+      Description: "This lambda fetches valid openhouse records from source and dumps into DB"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  ResoOpenHouseDownloadUtilityLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ResoOpenHouseDownloadUtilityLambdaFunction}"
+      RetentionInDays: 90
+
+  ResoMetadataDownloadLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: reso-metadata-download-func
+      Handler: app.lambda_handler
+      FunctionName: reso-metadata-download-func
+      Description: "This lambda fetches metadata from source and dumps into metadata tables"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  ResoMetadataDownloadLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ResoMetadataDownloadLambdaFunction}"
+      RetentionInDays: 90

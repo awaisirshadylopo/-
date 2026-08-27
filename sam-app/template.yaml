@@ -1,0 +1,1087 @@
+# ==============================================================================
+# File: sam-app -> template.yaml
+# Description: Main Template File
+# ==============================================================================
+
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  securityGroup:
+    Type: String
+
+  subnet1:
+    Type: String
+
+  subnet2:
+    Type: String
+
+  listingDatabase:
+    Type: String
+
+  rdsDatabase:
+    Type: String
+
+  ###################### GLOBAL VARIABLES #####################
+
+Globals:
+  Function:
+    VpcConfig:
+      SecurityGroupIds:
+        - !Ref securityGroup
+      SubnetIds:
+        - !Ref subnet1
+        - !Ref subnet2
+
+Resources:
+  ####################### IAM ROLE #################################
+  mlsLambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: mlsLambdaFunctionRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: MlsLambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:ListSecrets
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:UpdateSecret
+                  - secretsmanager:DeleteSecret
+                  - logs:*
+                  - cloudwatch:*
+                  - states:*
+                  - lambda:InvokeFunction
+                  - rds-data:*
+                  - codeguru-profiler:*
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                  - "s3:*"
+                  - "s3-object-lambda:*"
+                  - "scheduler:ListScheduleGroups"
+                  - "scheduler:ListSchedules"
+                  - "scheduler:GetSchedule"
+                  - "scheduler:GetScheduleGroup"
+                  - "scheduler:UpdateSchedule"
+                  - "iam:PassRole"
+                  - "cognito-idp:AdminInitiateAuth"
+                  - "glue:GetDatabase"
+                  - "glue:GetTable"
+                  - "glue:CreateTable"
+                  - "glue:UpdateTable"
+                  - "glue:GetPartitions"
+                  - "glue:BatchCreatePartition"
+                  - "glue:BatchUpdatePartition"
+                  - "glue:GetDatabases"
+                  - "glue:GetTables"
+                  - "athena:StartQueryExecution"
+                  - "athena:GetQueryExecution"
+                  - "athena:GetQueryResults"
+                  - "athena:StopQueryExecution"
+                  - "athena:GetWorkGroup"
+                  - "athena:ListWorkGroups"
+                Resource: "*"
+
+  mlsStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: states.amazonaws.com
+      Policies:
+        - PolicyName: mlsStateMachineRole
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogDelivery
+                  - logs:GetLogDelivery
+                  - logs:UpdateLogDelivery
+                  - logs:DeleteLogDelivery
+                  - logs:ListLogDeliveries
+                  - logs:PutResourcePolicy
+                  - logs:DescribeResourcePolicies
+                  - logs:DescribeLogGroups
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - xray:PutTraceSegments
+                  - xray:PutTelemetryRecords
+                  - xray:GetSamplingRules
+                  - xray:GetSamplingTargets
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - states:StartExecution
+                Resource: "*"
+
+  ###################### LAYERS #####################
+  awsWrangler:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: layers/awswrangler/wrangler.zip
+      CompatibleRuntimes:
+        - python3.9
+
+  helperLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: layers/helperLayer/helperLayer.zip
+      CompatibleRuntimes:
+        - python3.9
+
+  psycopg2:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: layers/psycopg2/pyscopg2.zip
+      CompatibleRuntimes:
+        - python3.9
+
+  requests:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: layers/requests/requests.zip
+      CompatibleRuntimes:
+        - python3.9
+  polars:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: layers/polars/polars.zip
+      CompatibleRuntimes:
+        - python3.12
+
+  ###################### LAMBDA FUNCTIONS #####################
+
+  LambdaFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  Functions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/mls/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+        awsWrangler: !Ref awsWrangler
+        psycopg2: !Ref psycopg2
+        helperLayer: !Ref helperLayer
+        requests: !Ref requests
+
+  InactiveFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/inactive_lambda_functions/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        polars: !Ref polars
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  # TrestleFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: lambda_functions/trestle/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+  #       awsWrangler: !Ref awsWrangler
+  #       psycopg2: !Ref psycopg2
+  #       helperLayer: !Ref helperLayer
+  #       requests: !Ref requests
+
+  # BridgeFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: lambda_functions/bridge/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+  #       awsWrangler: !Ref awsWrangler
+  #       psycopg2: !Ref psycopg2
+  #       helperLayer: !Ref helperLayer
+  #       requests: !Ref requests
+
+  ProptxFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/API/proptx/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+  
+  CommercialmlsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/API/commercialmls/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  ListhubFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/listhub/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+        awsWrangler: !Ref awsWrangler
+        psycopg2: !Ref psycopg2
+        helperLayer: !Ref helperLayer
+        requests: !Ref requests
+
+  # SparkFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: lambda_functions/spark/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+  #       awsWrangler: !Ref awsWrangler
+  #       psycopg2: !Ref psycopg2
+  #       helperLayer: !Ref helperLayer
+  #       requests: !Ref requests
+
+  ParagonFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/paragon/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+        awsWrangler: !Ref awsWrangler
+        psycopg2: !Ref psycopg2
+        helperLayer: !Ref helperLayer
+        requests: !Ref requests
+
+  # MlsrouterFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: lambda_functions/mlsrouter/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+  #       awsWrangler: !Ref awsWrangler
+  #       psycopg2: !Ref psycopg2
+  #       helperLayer: !Ref helperLayer
+  #       requests: !Ref requests
+
+  # DdfFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: lambda_functions/ddf/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+  #       awsWrangler: !Ref awsWrangler
+  #       psycopg2: !Ref psycopg2
+  #       helperLayer: !Ref helperLayer
+  #       requests: !Ref requests
+
+  # MlsgridFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: lambda_functions/mlsgrid/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+  #       awsWrangler: !Ref awsWrangler
+  #       psycopg2: !Ref psycopg2
+  #       helperLayer: !Ref helperLayer
+  #       requests: !Ref requests
+
+  # ResoFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: lambda_functions/reso/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+  #       awsWrangler: !Ref awsWrangler
+  #       psycopg2: !Ref psycopg2
+  #       helperLayer: !Ref helperLayer
+  #       requests: !Ref requests
+
+  SourceREFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/sourcere/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+        awsWrangler: !Ref awsWrangler
+        psycopg2: !Ref psycopg2
+        helperLayer: !Ref helperLayer
+        requests: !Ref requests
+
+  RAPIFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/rapi/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  ConnectmlsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/RETS/connectmls-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  TrestleRetsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/RETS/trestle-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  BrightRetsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/RETS/bright-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+  
+  GSMLSRetsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/RETS/gsmls-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  ParagonrelsRetsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/RETS/paragonrels-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  RapretsRetsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/RETS/raprets-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+  
+  SilvarRetsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/RETS/silvar-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  NavicamlsRetsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/RETS/navicamls-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  FlexmlsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/RETS/flexmls-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  MlsmatrixFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/RETS/Mlsmatrix-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  RapattoniFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/API/rapattoni/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  DovetailFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/API/Dovetail/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+  AlignedFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/API/aligned/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  UnifiedRetsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/LMD/RETS/unified-rets/unified-rets.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        polars: !Ref polars
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  ######################## S3 BUCKETS ##########################
+  MlsS3Buckets:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: s3_buckets/template.yaml
+
+  ######################## Glue Database ##########################
+  MlsGlueDatabase:
+    Type: AWS::Serverless::Application
+    DependsOn: mlsLambdaFunctionRole
+    Properties:
+      Location: glue_database/template.yaml
+
+  ######################## STATE MACHINES ################
+  StateMachines:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: state_machines/template.yaml
+      Parameters:
+        mlsStateMachineRole: !GetAtt mlsStateMachineRole.Arn
+
+  ###################### Operational Lambdas #########################
+  OperationalFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: lambda_functions/operations/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !GetAtt mlsLambdaFunctionRole.Arn
+
+  ######################## Scheduler Lambda ################
+  StateMachneExecutionNameSetterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda_functions/mls/state-machine-execution-name-setter-func
+      Handler: app.lambda_handler
+      FunctionName: state-machine-execution-name-setter-func
+      Description:
+        This lambda triggers Statemachines and set there execution named on
+        the basis of source type
+      Runtime: python3.9
+      Timeout: 180
+      MemorySize: 128
+      Role: !GetAtt mlsLambdaFunctionRole.Arn
+      Layers:
+        - !Sub arn:aws:lambda:${AWS::Region}:580247275435:layer:LambdaInsightsExtension:14
+        - !Ref awsWrangler
+        - !Ref helperLayer
+        - !Ref psycopg2
+
+      Environment:
+        Variables:
+          state_machine_name: mls-unified-lmd-state-machine
+      Events:
+        TrestleSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-TrestleAPI-statemachine-scheduler
+            ScheduleExpression: rate(2 minute)
+            State: DISABLED
+            Description: Trestle API Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "Trestle API"}'
+        TrestleInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-TrestleAPI-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: Trestle API Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "Trestle API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        SparkSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-SparkAPI-statemachine-scheduler
+            ScheduleExpression: rate(2 minute)
+            State: DISABLED
+            Description: Spark API Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "Spark API"}'
+        SparkInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-SparkAPI-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: Spark API Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "Spark API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        BridgeSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-BridgeAPI-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: Bridge API Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "Bridge API"}'
+        BridgeInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-BridgeAPI-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: Bridge API Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "Bridge API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        ParagonSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-ParagonAPI-statemachine-scheduler
+            ScheduleExpression: rate(10 minute)
+            State: DISABLED
+            Description: Paragon API Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "Paragon API"}'
+        ParagonInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-ParagonAPI-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: Paragon API Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "Paragon API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        MLSGridSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-MlsGridAPI-statemachine-scheduler
+            ScheduleExpression: rate(10 minute)
+            State: DISABLED
+            Description: MLS Grid V2 API Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "MLS Grid V2 API"}'
+        MLSGridInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-MlsGridAPI-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: MLS Grid V2 API Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "MLS Grid V2 API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        ResoSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-ResoAPI-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: Reso API Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "Reso API"}'
+        ResoInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-ResoAPI-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: Reso API Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "Reso API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        PropTXSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-PropTxAPI-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: PropTX API Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "PropTX API"}'
+        PropTXInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-PropTxAPI-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: PropTX API Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "PropTX API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        RAPISchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-RAPI-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: R API Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "R API"}'
+        RAPIInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-RAPI-statemachine-scheduler
+            ScheduleExpression: rate(30 minute)
+            State: DISABLED
+            Description: R API Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "R API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        DDFSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-DdfAPI-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: DDF API Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "DDF API"}'
+        DDFInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-DdfAPI-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: DDF API Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "DDF API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        SourceRESchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-SourceReAPI-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: SourceRE API Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "SourceRE API"}'
+        SourceREInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-SourceReAPI-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: SourceRE API Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "SourceRE API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        CommercialmlsSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-CommercialMlsAPI-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: Commercialmls API Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "Commercialmls API"}'
+        CommercialmlsInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-CommercialMlsAPI-statemachine-scheduler
+            ScheduleExpression: rate(25 minute)
+            State: DISABLED
+            Description: Commercialmls API Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "Commercialmls API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        RapattoniSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-RapattoniAPI-statemachine-scheduler
+            ScheduleExpression: rate(10 minute)
+            State: DISABLED
+            Description: Rapattoni API Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "Rapattoni API"}'
+        RapattoniInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-RapattoniAPI-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: Rapattoni API Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "Rapattoni API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        DovetailSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-Dovetail-statemachine-scheduler
+            ScheduleExpression: rate(10 minute)
+            State: DISABLED
+            Description: Dovetail Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "Dovetail API"}'
+        DovetailInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-Dovetail-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: Dovetail Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "Dovetail API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        AlignedSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-Aligned-statemachine-scheduler
+            ScheduleExpression: rate(10 minute)
+            State: DISABLED
+            Description: aligned Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "Aligned API"}'
+        AlignedInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-Aligned-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: Aligned Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "Aligned API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        MLSRouterSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-MlsRouterAPI-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: MLS Router API Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "MLS Router API"}'
+        MLSRouterInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-MlsRouterAPI-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: MLS Router API Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "MLS Router API",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        UnifiedRetsSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-UnifiedRETS-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: Unified RETS Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "Unified RETS"}'
+        UnifiedRetsInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-UnifiedRETS-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: Unified RETS Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "Unified RETS",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        TrestleRetsSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-TrestleRETS-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: Trestle RETS Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "Trestle RETS"}'
+        TrestleRetsInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-TrestleRETS-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: Trestle RETS Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "Trestle RETS",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        NavicamlsRetsSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-NavicaMlsRETS-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: Navicamls RETS Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "Navicamls RETS"}'
+        NavicamlsRetsInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-NavicaMlsRETS-statemachine-scheduler
+            ScheduleExpression: rate(20 minute)
+            State: DISABLED
+            Description: Navicamls RETS Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "Navicamls RETS",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        SilvarRetsSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-SilvarRETS-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: Silvar RETS Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "RETS-Silvar"}'
+        SilvarRetsInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-SilvarRETS-statemachine-scheduler
+            ScheduleExpression: rate(20 minute)
+            State: DISABLED
+            Description: RETS-Silvar Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "RETS-Silvar",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        RapretsRetsSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-RapRetsRETS-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: RAPrets RETS Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "RAPrets RETS"}'
+        RapretsRetsInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-RapRetsRETS-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: RAPrets RETS Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "RAPrets RETS",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        ParagonrelsRetsSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-ParagonRelsRETS-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: Paragonrels RETS Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "Paragonrels RETS"}'
+        ParagonrelsRetsInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-ParagonRelsRETS-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: Paragonrels RETS Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "Paragonrels RETS",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        MlsmatrixRetsSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-MlsMatrixRETS-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: Mlsmatrix RETS Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "Mlsmatrix RETS" }'
+        MlsMatrixRetsInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-MlsMatrixRETS-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: Mlsmatrix RETS Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "Mlsmatrix RETS",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        FlexmlsRetsSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-FlexMlsRETS-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: FlexMLS RETS Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "FlexMLS RETS"}'
+        FlexmlsRetsInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-FlexMlsRETS-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: FlexMLS RETS Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "FlexMLS RETS",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        ConnectmlsRetsSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-ConnectMlsRETS-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: ConnectMLS RETS Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "ConnectMLS RETS"}'
+        ConnectmlsRetsInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-ConnectMlsRETS-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: ConnectMLS RETS Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "ConnectMLS RETS",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        BrightRetsSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-BrightRETS-statemachine-scheduler
+            ScheduleExpression: rate(2 minute)
+            State: DISABLED
+            Description: RETS BRIGHT Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "RETS BRIGHT"}'
+        BrightRetsInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-BrightRETS-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: RETS BRIGHT Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "RETS BRIGHT",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+        GSMLSRetsSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: lmd-GsmlsRETS-statemachine-scheduler
+            ScheduleExpression: rate(5 minute)
+            State: DISABLED
+            Description: GSMLS RETS Unified LMD Flow State Machine Schedule Event
+            Input: '{ "source_type": "GSMLS RETS"}'
+        GSMLSRetsInactiveSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: inv-GsmlsRETS-statemachine-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: GSMLS RETS Inactive Flow State Machine Schedule Event
+            Input: '{ "source_type": "GSMLS RETS",
+              "state_machine_name": "unified-rets-inactive-state-machine"}'
+
+  StateMachneExecutionNameSetterFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: StateMachneExecutionNameSetterFunction
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${StateMachneExecutionNameSetterFunction}
+      RetentionInDays: 90

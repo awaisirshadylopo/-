@@ -1,0 +1,187 @@
+# ==============================================================================
+# File: trestle-api -> template.yaml
+# Description: Creation of Trestle API Specific Lambda Functions
+# ==============================================================================
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  securityGroup:
+    Type: String
+
+  subnet1:
+    Type: String
+
+  subnet2:
+    Type: String
+
+  listingDatabase:
+    Type: String
+
+  rdsDatabase:
+    Type: String
+
+  mlsLambdaFunctionRole:
+    Type: String
+
+
+Resources:
+  TrestleActiveDataDownloadLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: trestle-active-data-download-func
+      Handler: app.lambda_handler
+      FunctionName: trestle-active-data-download-func
+      Description: "This lambda fetches data from source and dumps into DB"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          bucket_name: !Sub idx-data-lake-${AWS::AccountId}-${AWS::Region}
+          sqlExecLimit: 900000
+
+  TrestleActiveDataDownloadLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${TrestleActiveDataDownloadLambdaFunction}"
+      RetentionInDays: 90
+
+  TrestleInactiveDataDownloadLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: trestle-inactive-data-download-func
+      Handler: app.lambda_handler
+      FunctionName: trestle-inactive-data-download-func
+      Description: "This lambda fetches all active data from source and dumps into DB"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  TrestleInactiveDataDownloadLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${TrestleInactiveDataDownloadLambdaFunction}"
+      RetentionInDays: 90
+
+  TrestleOpenHouseDownloadUtilityLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: trestle-openhouse-download-utility-func
+      Handler: app.lambda_handler
+      # FunctionName: trestle-openhouse-download-utility-func
+      FunctionName: trestle-inactive-openhouse-download-func
+      Description: "This lambda fetches valid openhouse records from source and dumps into DB"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  TrestleOpenHouseDownloadUtilityLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${TrestleOpenHouseDownloadUtilityLambdaFunction}"
+      RetentionInDays: 90
+
+  TrestleMissingSoldDatePriceUtilityLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: trestle-missing-sold-date-price-utility-func
+      Handler: app.lambda_handler
+      # FunctionName: trestle-missing-sold-date-price-utility-func
+      FunctionName: trestle-missing-sold-date-utility-func
+      Description: "This lambda fetches sold date and sold price from source and updates in DB where listing_p_sold records have null sold_date or sold_price"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  TrestleMissingSoldDatePriceUtilityLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${TrestleMissingSoldDatePriceUtilityLambdaFunction}"
+      RetentionInDays: 90
+
+  TrestleMetadataDownloadLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: trestle-metadata-download-func
+      Handler: app.lambda_handler
+      FunctionName: trestle-metadata-download-func
+      Description: "This lambda fetches metadata from source and dumps into metadata tables"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  TrestleMetadataDownloadLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${TrestleMetadataDownloadLambdaFunction}"
+      RetentionInDays: 90

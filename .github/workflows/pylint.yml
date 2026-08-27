@@ -1,0 +1,19 @@
+name: PyLint
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ['Build and Publish App']
+    branches:
+      - main
+    types: [completed]
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  python-lint:
+    uses: Ylopo/ylopo-github-actions-workflows/.github/workflows/pylint-sam.yml@v5
+    secrets: inherit
+    with:
+      environment: 'dev'

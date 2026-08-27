@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  mlsStateMachineRole:
+    Type: String
+
+Resources:
+  UnifiedInvFlowStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Role: !Ref mlsStateMachineRole
+      # Name: unified-inv-flow-state-machine
+      Name: unified-rets-inactive-state-machine
+      DefinitionSubstitutions:
+        awsRegion: !Ref AWS::Region
+        awsAccountId: !Ref AWS::AccountId
+      DefinitionUri: unified-inv-flow-state-machine/unified_inv_flow_state_machine.json
+
+  UnifiedLmdFlowStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Role: !Ref mlsStateMachineRole
+      # Name: unified-lmd-flow-state-machine
+      Name: mls-unified-lmd-state-machine
+      DefinitionSubstitutions:
+        awsRegion: !Ref AWS::Region
+        awsAccountId: !Ref AWS::AccountId
+      DefinitionUri: unified-lmd-flow-state-machine/unified_lmd_flow_state_machine.json

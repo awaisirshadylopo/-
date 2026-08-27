@@ -1,0 +1,522 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  securityGroup:
+    Type: String
+
+  subnet1:
+    Type: String
+
+  subnet2:
+    Type: String
+
+  listingDatabase:
+    Type: String
+
+  rdsDatabase:
+    Type: String
+
+  polars:
+    Type: String
+
+  mlsLambdaFunctionRole:
+    Type: String
+
+Resources:
+  PurgeOldOpenHouseRecordsUtilityLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: inactive_utilities/openhouse-purging/template.yaml
+      Parameters:
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  ParagonrelsRetsMissingSoldDateUtility:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: inactive_utilities/missing_sold_price_sold_date_lambdas/paragonrels-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  ConnectMlsInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: RETS/connectmls-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  FlexMlsInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: RETS/flexmls-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  SourceREInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: API/sourcere-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        polars: !Ref polars
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+  
+  CommercialmlsInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: API/commercialmls-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  # DdfapiInactiveDataDownloadLambda:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: API/ddf-api/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  # MlsrouterInactiveDataDownloadLambda:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: API/mlsrouter-api/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole        
+
+  ConnectmlsrelsRetsMissingSoldDateUtility:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: inactive_utilities/missing_sold_price_sold_date_lambdas/connectmls-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  TrestlesrelsRetsMissingSoldDateUtility:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: inactive_utilities/missing_sold_price_sold_date_lambdas/trestle-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+        
+  # TrestleApiMissingSoldDateUtility:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: inactive_utilities/missing_sold_price_sold_date_lambdas/API/trestle-api/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  SilvarRetsMissingSoldDateUtility:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: inactive_utilities/missing_sold_price_sold_date_lambdas/silvar-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+
+  SilvarRetsMissingPhotosUtility:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: inactive_utilities/missing_photos_backfill_lambdas/silvar-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+
+
+  ParagonApiMissingPhotosUtility:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: inactive_utilities/missing_photos_backfill_lambdas/paragon-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+
+  TrestleApiMissingPhotosUtility:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: inactive_utilities/missing_photos_backfill_lambdas/trestle-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  RApiMissingPhotosUtility:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: inactive_utilities/missing_photos_backfill_lambdas/R-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  UnifiedRetsInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: RETS/unified-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  BrightRetsInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: RETS/bright-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+
+  BrightrelsRetsMissingSoldDateUtility:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: inactive_utilities/missing_sold_price_sold_date_lambdas/bright-rets/Bright.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  RapRetsInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: RETS/raprets-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  MlsMatrixRetsInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: RETS/mlsmatrix-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  ParagonrelsRetsInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: RETS/paragonrels-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+  
+  # TrestleRetsInactiveDataDownloadLambda:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: RETS/trestle-rets/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  SilvarRetsInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: RETS/silvar-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+        
+  NavicamlsRetsInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: RETS/navicamls-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+  
+  GSMLSRetsInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: RETS/gsmls-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+  
+  MlsMatrixRetsMissingSoldDateUtility:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: inactive_utilities/missing_sold_price_sold_date_lambdas/mlsmatrix-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  RapiMissingSoldDateUtility:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: inactive_utilities/missing_sold_price_sold_date_lambdas/API/rapi/rapi.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+  
+  RapattoniInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: API/rapattoni-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        polars: !Ref polars
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  DoveInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: API/dovetail-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        polars: !Ref polars
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+  
+  AlignedInactiveDataDownloadLambda:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: API/aligned-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        polars: !Ref polars
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  # ResoInactiveDataDownloadLambda:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: API/reso-api/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       polars: !Ref polars
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+Outputs:
+  ConnectMlsInactiveDataDownloadLambda:
+    Description: "ConnectMlsInactiveDataDownloadLambda"
+    Value: !GetAtt ConnectMlsInactiveDataDownloadLambda.Outputs.ConnectMlsInactiveDataDownloadLambdaFunction
+
+  FlexMlsInactiveDataDownloadLambda:
+    Description: "FlexMlsInactiveDataDownloadLambda"
+    Value: !GetAtt FlexMlsInactiveDataDownloadLambda.Outputs.FlexMlsInactiveDataDownloadLambdaFunction
+
+  MlsMatrixRetsInactiveDataDownloadLambda:
+    Description: "MlsMatrixRetsInactiveDataDownloadLambda"
+    Value: !GetAtt MlsMatrixRetsInactiveDataDownloadLambda.Outputs.MlsMatrixRetsInactiveDataDownloadLambdaFunction
+
+  ParagonrelsRetsInactiveDataDownloadLambda:
+    Description: "ParagonrelsRetsInactiveDataDownloadLambda"
+    Value: !GetAtt ParagonrelsRetsInactiveDataDownloadLambda.Outputs.ParagonrelsRetsInactiveDataDownloadLambdaFunction
+  
+  # TrestleRetsInactiveDataDownloadLambda:
+  #   Description: "TrestleRetsInactiveDataDownloadLambda"
+  #   Value: !GetAtt TrestleRetsInactiveDataDownloadLambda.Outputs.TrestleRetsInactiveDataDownloadLambdaFunction
+  
+  SilvarRetsInactiveDataDownloadLambda:
+    Description: "SilvarRetsInactiveDataDownloadLambda"
+    Value: !GetAtt SilvarRetsInactiveDataDownloadLambda.Outputs.SilvarRetsInactiveDataDownloadLambdaFunction
+  
+  RapRetsInactiveDataDownloadLambda:
+    Description: "RapRetsInactiveDataDownloadLambda"
+    Value: !GetAtt RapRetsInactiveDataDownloadLambda.Outputs.RapRetsInactiveDataDownloadLambdaFunction
+  
+  SourceREInactiveDataDownloadLambda:
+    Description: "SourceREInactiveDataDownloadLambda"
+    Value: !GetAtt SourceREInactiveDataDownloadLambda.Outputs.SourceREInactiveDataDownloadLambdaFunction
+  
+  CommercialmlsInactiveDataDownloadLambda:
+    Description: "CommercialmlsInactiveDataDownloadLambda"
+    Value: !GetAtt CommercialmlsInactiveDataDownloadLambda.Outputs.CommercialmlsInactiveDataDownloadLambdaFunction
+
+  # DdfapiInactiveDataDownloadLambda:
+  #   Description: "DdfapiInactiveDataDownloadLambda"
+  #   Value: !GetAtt DdfapiInactiveDataDownloadLambda.Outputs.DdfapiInactiveDataDownloadLambdaFunction 
+
+
+  # MlsrouterInactiveDataDownloadLambda:
+  #   Description: "MlsrouterInactiveDataDownloadLambda"
+  #   Value: !GetAtt MlsrouterInactiveDataDownloadLambda.Outputs.MlsrouterApiInactiveDataDownloadLambdaFunction
+
+  ConnectmlsrelsRetsMissingSoldDateUtility:
+    Description: "ConnectmlsrelsRetsMissingSoldDateUtility"
+    Value: !GetAtt ConnectmlsrelsRetsMissingSoldDateUtility.Outputs.ConnectMlsRetsMissingSoldDateUtilityFunction
+
+  MlsMatrixRetsMissingSoldDateUtility:
+    Description: "MlsMatrixRetsMissingSoldDateUtility"
+    Value: !GetAtt MlsMatrixRetsMissingSoldDateUtility.Outputs.MlsMatrixRetsMissingSoldDateUtilityFunction
+
+  RapiMissingSoldDateUtility:
+    Description: "RapiMissingSoldDateUtility"
+    Value: !GetAtt RapiMissingSoldDateUtility.Outputs.RapiMissingSoldDateUtilityFunction
+    
+  # TresleApiMissingSoldDateUtility:
+  #   Description: "TrestleApiMissingSoldDateUtility"
+  #   Value: !GetAtt TrestleApiMissingSoldDateUtility.Outputs.TrestleApiMissingSoldDateUtilityFunction
+
+
+  SilvarRetsMissingSoldDateUtility:
+    Description: "SilvarRetsMissingSoldDateUtility"
+    Value: !GetAtt SilvarRetsMissingSoldDateUtility.Outputs.silvarRetsMissingSoldDateUtilityFunctionArn
+    
+  SilvarRetsMissingPhotosUtility:
+    Description: "SilvarRetsMissingPhotosUtility"
+    Value: !GetAtt SilvarRetsMissingPhotosUtility.Outputs.silvarRetsMissingPhotosUtilityFunctionArn
+  
+  ParagonApiMissingPhotosUtility:
+    Description: "ParagonApiMissingPhotosUtility"
+    Value: !GetAtt ParagonApiMissingPhotosUtility.Outputs.paragonApiMissingPhotosUtilityFunctionArn
+  
+  TrestleApiMissingPhotosUtility:
+    Description: "TrestleApiMissingPhotosUtility"
+    Value: !GetAtt TrestleApiMissingPhotosUtility.Outputs.trestleApiMissingPhotosUtilityFunctionArn
+
+  RApiMissingPhotosUtility:
+    Description: "RApiMissingPhotosUtility"
+    Value: !GetAtt RApiMissingPhotosUtility.Outputs.rApiMissingPhotosUtilityFunctionArn
+
+  PurgeOldOpenHouseRecordsUtilityLambda:
+    Description: "PurgeOldOpenHouseRecordsUtilityLambda"
+    Value: !GetAtt PurgeOldOpenHouseRecordsUtilityLambda.Outputs.PurgeOldOpenHouseRecordsLambda
+
+  RapattoniInactiveDataDownloadLambda:
+    Description: "RapattoniInactiveDataDownloadLambda"
+    Value: !GetAtt RapattoniInactiveDataDownloadLambda.Outputs.RapattoniInactiveDataDownloadLambdaFunction
+
+  DovetailInactiveDataDownloadLambda:
+    Description: "DovetailInactiveDataDownloadLambda"
+    Value: !GetAtt DoveInactiveDataDownloadLambda.Outputs.DoveInactiveDataDownloadLambdaFunction
+
+  AlignedInactiveDataDownloadLambda:
+    Description: "AlignedInactiveDataDownloadLambda"
+    Value: !GetAtt AlignedInactiveDataDownloadLambda.Outputs.AlignedInactiveDataDownloadLambdaFunction
+
+  # ResoInactiveDataDownloadLambda:
+  #   Description: "ResoInactiveDataDownloadLambda"
+  #   Value: !GetAtt ResoInactiveDataDownloadLambda.Outputs.ResoInactiveDataDownloadLambdaFunction

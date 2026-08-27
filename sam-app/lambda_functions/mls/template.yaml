@@ -1,0 +1,821 @@
+# ==============================================================================
+# File: template.yaml
+# Description: Creation of Common MLS Lambda Functions
+# Author: msanaullah
+# Last Updated: 2025-01-15
+# ==============================================================================
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  securityGroup:
+    Type: String
+
+  subnet1:
+    Type: String
+
+  subnet2:
+    Type: String
+
+  listingDatabase:
+    Type: String
+
+  rdsDatabase:
+    Type: String
+
+  mlsLambdaFunctionRole:
+    Type: String
+
+  awsWrangler:
+    Type: String
+
+  psycopg2:
+    Type: String
+
+  helperLayer:
+    Type: String
+
+  requests:
+    Type: String
+
+  CognitoUserPoolName:
+    Type: String
+    Default: "scheduler-api-user-pool"
+    Description: "Name for the Cognito User Pool"
+
+  CognitoUserPoolClientName:
+    Type: String
+    Default: "scheduler-api-client"
+    Description: "Name for the Cognito User Pool Client"
+
+  Email1:
+    Type: String
+    Default: "fahmad@ylopo.com"
+
+Globals:
+  Function:
+    VpcConfig:
+      SecurityGroupIds:
+        - !Ref securityGroup
+      SubnetIds:
+        - !Ref subnet1
+        - !Ref subnet2
+
+Resources:
+  LockingLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-active-unified-locking-func
+      Handler: app.lambda_handler
+      FunctionName: mls-active-unified-locking-func
+      Description: "This lambda selects the available source ID based on the source type provided in the event, then updates the corresponding database tables by setting the run host to 'serverless-{source_type}'."
+      Runtime: python3.12
+      Timeout: 600
+      MemorySize: 196
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          limit: 70
+  LockingLambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: LockingLambdaFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${LockingLambdaFunction}"
+      RetentionInDays: 90
+
+  ETLBatchTypeLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-active-etl-batch-type-func
+      Handler: app.lambda_handler
+      FunctionName: mls-active-etl-batch-type-func
+      Description: "This lambda create etl bactch , decide batch type and deletes downloaded data in pre-stage tables."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 512
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          bucket_name: !Sub idx-data-lake-${AWS::AccountId}-${AWS::Region}
+  ETLBatchTypeLambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: ETLBatchTypeLambdaFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ETLBatchTypeLambdaFunction}"
+      RetentionInDays: 90
+
+  DeleteStagingDataFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-active-delete-staging-data-func
+      Handler: app.lambda_handler
+      FunctionName: mls-active-delete-staging-data-func
+      Description: "This lambda deletes data from Stage/Generic tables."
+      Runtime: python3.12
+      Timeout: 600
+      MemorySize: 128
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  DeleteStagingDataFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: DeleteStagingDataFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${DeleteStagingDataFunction}"
+      RetentionInDays: 90
+
+  MappingsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-active-mapping-func
+      Handler: app.lambda_handler
+      FunctionName: mls-active-mapping-func
+      Description: "This lambda retrieves data from pre-stage tables, applies business transformations, and then loads it into a generic stage."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 256
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  MappingsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: MappingsFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${MappingsFunction}"
+      RetentionInDays: 90
+
+  ETLActionsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-active-etl-action-func
+      Handler: app.lambda_handler
+      FunctionName: mls-active-etl-action-func
+      Description: "This Lambda distinguishes between insertion and updation cases based on target listing table comparison, inserting insertion listings into etl_insert table and both insertion and update listings into etl_update table."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1700
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          bucket_name: !Sub idx-data-lake-${AWS::AccountId}-${AWS::Region}
+          sqlExecLimit: 900000
+  ETLActionsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: ETLActionsFunction
+    Properties:
+      LogGroupName: !Join ["", ["/aws/lambda/", !Ref ETLActionsFunction]]
+      RetentionInDays: 90
+
+  NoInsertUpdateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-active-no-insert-update-func
+      Handler: app.lambda_handler
+      FunctionName: mls-active-no-insert-update-func
+      Description: "This Lambda Will update batch metadata details when no row count is zero"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 128
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  NoInsertUpdateFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: NoInsertUpdateFunction
+    Properties:
+      LogGroupName: !Join ["", ["/aws/lambda/", !Ref NoInsertUpdateFunction]]
+      RetentionInDays: 90
+
+  DataSyncFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-active-data-sync-func
+      Handler: app.lambda_handler
+      FunctionName: mls-active-data-sync-func
+      Description: "This lambda loads data into the target listing from the staging area, focusing on insertions at present."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 5000
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          sqlExecLimit: 900000
+  DataSyncFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: DataSyncFunction
+    Properties:
+      LogGroupName: !Join ["", ["/aws/lambda/", !Ref DataSyncFunction]]
+      RetentionInDays: 90
+      
+
+  DataPurgeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-active-data-quality-manager-func
+      Handler: app.lambda_handler
+      FunctionName: mls-active-data-quality-manager-func
+      Description: "Evaluates MLS active data for quality thresholds, performs necessary refinements, and manages lifecycle actions such as cleanup or synchronization."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 5000
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          sqlExecLimit: 900000
+  DataPurgeFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: DataPurgeFunction
+    Properties:
+      LogGroupName: !Join ["", ["/aws/lambda/", !Ref DataPurgeFunction]]
+      RetentionInDays: 90
+
+  CacheCleaningFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-cache-clean-func
+      Handler: app.lambda_handler
+      FunctionName: mls-cache-clean-func
+      Description: "This lambda triggers a POST request for the corresponding source ID to clear the cache."
+      Runtime: python3.12
+      Timeout: 180
+      MemorySize: 128
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:580247275435:layer:LambdaInsightsExtension:14"
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+        - !Ref requests
+      Environment:
+        Variables:
+          url: "http://listing-api.prod.ylopo:7781/api/1.0/source/bustCacheForSource/"
+  CacheCleaningFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: CacheCleaningFunction
+    Properties:
+      LogGroupName: !Join ["", ["/aws/lambda/", !Ref CacheCleaningFunction]]
+      RetentionInDays: 90
+
+  UnlockingLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-active-unlocking-func
+      Handler: app.lambda_handler
+      FunctionName: mls-active-unlocking-func
+      Description: "This lambda releases the source_id. Upon successful execution, it updates the last modification and sets the run host to null. If unsuccessful, it solely sets the run host to null."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 256
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  UnlockingLambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: UnlockingLambdaFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${UnlockingLambdaFunction}"
+      RetentionInDays: 90
+
+  InactiveMappingLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-inactive-mapping-func
+      Handler: app.lambda_handler
+      FunctionName: mls-inactive-mapping-func
+      Description: "This lambda maps inactive data for the specified source."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 256
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  InactiveMappingLambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: InactiveMappingLambdaFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${InactiveMappingLambdaFunction}"
+      RetentionInDays: 90
+
+  InactiveLockingLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-inactive-locking-func
+      Handler: app.lambda_handler
+      FunctionName: mls-inactive-locking-func
+      Description: "This Lambda is responsible for locking the source ID for inactive executions."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 256
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  InactiveLockingLambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: InactiveLockingLambdaFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${InactiveLockingLambdaFunction}"
+      RetentionInDays: 90
+
+  InactiveUnlockingLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-inactive-unlocking-func
+      Handler: app.lambda_handler
+      FunctionName: mls-inactive-unlocking-func
+      Description: "This Lambda is responsible for unlocking the source ID after an inactive execution."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 256
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  InactiveUnlockingLambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: InactiveUnlockingLambdaFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${InactiveUnlockingLambdaFunction}"
+      RetentionInDays: 90
+
+  S3GluePartitionScanLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-s3-glue-partition-scan-func
+      Handler: app.lambda_handler
+      FunctionName: mls-s3-glue-partition-scan-func
+      Description: "This lambda scans the S3 bucket for new partitions and updates the Glue catalog accordingly."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          bucket_name: !Sub idx-data-lake-${AWS::AccountId}-${AWS::Region}
+          glue_database: idx_datalake
+          athena_output_bucket: !Sub idx-athena-query-results-${AWS::AccountId}-${AWS::Region}
+  S3GluePartitionScanLambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: S3GluePartitionScanLambdaFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${S3GluePartitionScanLambdaFunction}"
+      RetentionInDays: 90
+
+  AthenaQueryToRDSFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-athena-query-to-rds-func
+      Handler: app.lambda_handler
+      FunctionName: mls-athena-query-to-rds-func
+      Description: "This lambda executes Athena queries and updates the RDS database accordingly."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          bucket_name: !Sub idx-data-lake-${AWS::AccountId}-${AWS::Region}
+          glue_database: idx_datalake
+          athena_output_bucket: !Sub idx-athena-query-results-${AWS::AccountId}-${AWS::Region}
+  AthenaQueryToRDSFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: AthenaQueryToRDSFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AthenaQueryToRDSFunction}"
+      RetentionInDays: 90
+
+  StageListingSyncLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-active-stage-listing-migration-func
+      Handler: app.lambda_handler
+      FunctionName: mls-active-stage-listing-migration-func
+      Description: "This lambda will move data form generic to listing tables."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 256
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+  StageListingSyncLambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: StageListingSyncLambdaFunction
+    Properties:
+      LogGroupName:
+        !Join ["", ["/aws/lambda/", !Ref StageListingSyncLambdaFunction]]
+      RetentionInDays: 90
+
+  MappingBackupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mapping-backup-func
+      Handler: app.lambda_handler
+      FunctionName: mapping-backup-func
+      Description: "This lambda will backup the data from the RDS Mappings Table to S3."
+      Runtime: python3.12
+      Timeout: 600
+      MemorySize: 256
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          BucketName: !Sub "idx-mapping-backup-${AWS::AccountId}-${AWS::Region}"
+      Events:
+        MappingBackupSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: ops-MappingsBackup-lambda-scheduler
+            ScheduleExpression: cron(0 6 * * ? *)
+            State: DISABLED
+            Description: "Daily backup of the RDS Mappings Table to S3"
+  MappingBackupFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: MappingBackupFunction
+    Properties:
+      LogGroupName: !Join ["", ["/aws/lambda/", !Ref MappingBackupFunction]]
+      RetentionInDays: 90
+
+  LookupSyncHomelistingtoRDSFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-lookup-sync-homelisting-to-rds-func
+      Handler: app.lambda_handler
+      FunctionName: mls-lookup-sync-homelisting-to-rds-func
+      Description: "This lambda will fetch entries from homelisting lookup table and insert into RDS lookup table (if not exists in RDS)."
+      Runtime: python3.12
+      Timeout: 600
+      MemorySize: 256
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+      Events:
+        LookupSyncHomelistingtoRDSSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: ops-SyncLookups-lambda-scheduler
+            ScheduleExpression: cron(0 6 * * ? *)
+            State: DISABLED
+            Description: "Daily syncing of homelisting lookup to RDS"
+  LookupSyncHomelistingtoRDSFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: LookupSyncHomelistingtoRDSFunction
+    Properties:
+      LogGroupName:
+        !Join ["", ["/aws/lambda/", !Ref LookupSyncHomelistingtoRDSFunction]]
+      RetentionInDays: 90
+
+  MlsBiActiveListingsLogsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-bi-active-listings-logs-func
+      Handler: app.lambda_handler
+      FunctionName: mls-bi-active-listings-logs-func
+      Description: "This lambda populates the table in bi.ACTIVE_LISTINGS_LOGS in Homelistings DB."
+      Runtime: python3.12
+      Timeout: 600
+      MemorySize: 256
+      Role: !Ref mlsLambdaFunctionRole
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+      Events:
+        MlsBiActiveListingsLogsSchedulerEvent:
+          Type: ScheduleV2
+          Properties:
+            Name: ops-BiActiveListingsLogs-scheduler
+            ScheduleExpression: rate(15 minute)
+            State: DISABLED
+            Description: "Lambda scheduler for mls-bi-active-listings-logs-func"
+  MlsBiActiveListingsLogsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: MlsBiActiveListingsLogsFunction
+    Properties:
+      LogGroupName:
+        !Join ["", ["/aws/lambda/", !Ref MlsBiActiveListingsLogsFunction]]
+      RetentionInDays: 90
+      
+
+  # Lambda Function with API Gateway Integration
+  SchedulerStateUpdateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: scheduler-state-update-func
+      Handler: app.lambda_handler
+      FunctionName: scheduler-state-update-func
+      Description: "This lambda will update the state of an existing AWS Scheduler schedule."
+      Runtime: python3.12
+      Timeout: 60
+      MemorySize: 128
+      Role: !Ref mlsLambdaFunctionRole
+      Events:
+        SchedulerStateUpdateApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref SchedulerApi
+            Path: /scheduler-state-update
+            Method: post
+            Auth:
+              Authorizer: CognitoAuthorizer
+  # CloudWatch Log Group
+  SchedulerStateUpdateFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: SchedulerStateUpdateFunction
+    Properties:
+      LogGroupName:
+        !Join ["", ["/aws/lambda/", !Ref SchedulerStateUpdateFunction]]
+      RetentionInDays: 90
+
+    # Cognito User Pool
+  SchedulerApiUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Ref CognitoUserPoolName
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: false
+          Required: true
+        - Name: name
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      UserPoolTags:
+        Environment: !Ref AWS::StackName
+        Application: SchedulerAPI
+
+  # Cognito User Pool Client
+  SchedulerApiUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref SchedulerApiUserPool
+      ClientName: !Ref CognitoUserPoolClientName
+      GenerateSecret: false
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs:
+        - https://localhost:3000/callback
+      LogoutURLs:
+        - https://localhost:3000/logout
+      AllowedOAuthFlows:
+        - code
+        - implicit
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+      AllowedOAuthFlowsUserPoolClient: true
+      ExplicitAuthFlows:
+        - ALLOW_ADMIN_USER_PASSWORD_AUTH
+        - ALLOW_CUSTOM_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_USER_SRP_AUTH
+      PreventUserExistenceErrors: ENABLED
+
+  # Cognito User Pool Domain
+  SchedulerApiUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref SchedulerApiUserPool
+      Domain: !Sub "scheduler-api-user-pool-domain-${AWS::AccountId}"
+
+  # API Gateway with Cognito Authorizer
+  SchedulerApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt SchedulerApiUserPool.Arn
+            Identity:
+              Header: Authorization
+
+  MlsCognitoAuthorizerUserPoolUser1:
+    Type: AWS::Cognito::UserPoolUser
+    Properties:
+      UserAttributes:
+        - Name: email
+          Value: !Ref Email1
+        - Name: email_verified
+          Value: true
+      Username: !Ref Email1
+      UserPoolId: !Ref SchedulerApiUserPool
+
+  # Lambda Function with API Gateway Integration
+  APITokenGenerationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mls-api-token-generation-func
+      Handler: app.lambda_handler
+      FunctionName: mls-api-token-generation-func
+      Description: "This lambda will handle API requests with Cognito authentication token generation."
+      Runtime: python3.12
+      Timeout: 45
+      MemorySize: 128
+      Role: !Ref mlsLambdaFunctionRole
+      Environment:
+        Variables:
+          UserpoolID: !Ref SchedulerApiUserPool
+          ClientID: !Ref SchedulerApiUserPoolClient
+      Events:
+        APICognitoAuthApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref SchedulerApi
+            Path: /api-token
+            Method: Get
+            Auth:
+              Authorizer: NONE
+  # CloudWatch Log Group
+  APITokenGenerationFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: APITokenGenerationFunction
+    Properties:
+      LogGroupName:
+        !Join ["", ["/aws/lambda/", !Ref APITokenGenerationFunction]]
+      RetentionInDays: 90
+
+Outputs:
+  lockingLambdaFunction:
+    Description: "LockingLambdaFunction"
+    Value: !GetAtt LockingLambdaFunction.Arn
+  inactiveMappingLambdaFunction:
+    Description: "InactiveMappingLambdaFunction"
+    Value: !GetAtt InactiveMappingLambdaFunction.Arn
+  inactiveUnlockingLambdaFunction:
+    Description: "InactiveUnlockingLambdaFunction"
+    Value: !GetAtt InactiveUnlockingLambdaFunction.Arn
+  inactiveLockingLambdaFunction:
+    Description: "InactiveLockingLambdaFunction"
+    Value: !GetAtt InactiveLockingLambdaFunction.Arn
+  etlBatchTypeLambdaFunction:
+    Description: "ETLBatchTypeLambdaFunction"
+    Value: !GetAtt ETLBatchTypeLambdaFunction.Arn
+  noInsertUpdateFunction:
+    Description: "NoInsertUpdateFunction"
+    Value: !GetAtt NoInsertUpdateFunction.Arn
+  deleteStagingDataFunction:
+    Description: "DeleteStagingDataFunction"
+    Value: !GetAtt DeleteStagingDataFunction.Arn
+  mappingsFunction:
+    Description: "MappingsFunction"
+    Value: !GetAtt MappingsFunction.Arn
+  etlActionsFunction:
+    Description: "ETLActionsFunction"
+    Value: !GetAtt ETLActionsFunction.Arn
+  dataSyncFunction:
+    Description: "DataSyncFunction"
+    Value: !GetAtt DataSyncFunction.Arn
+  DataPurgeFunction:
+    Description: "DataPurgeFunction"
+    Value: !GetAtt DataPurgeFunction.Arn
+  cacheCleaningFunction:
+    Description: "CacheCleaningFunction"
+    Value: !GetAtt CacheCleaningFunction.Arn
+  unlockingLambdaFunction:
+    Description: "UnlockingLambdaFunction"
+    Value: !GetAtt UnlockingLambdaFunction.Arn
+  S3GluePartitionScanLambdaFunction:
+    Description: "S3GluePartitionScanLambdaFunction"
+    Value: !GetAtt S3GluePartitionScanLambdaFunction.Arn
+  AthenaQueryToRDSFunction:
+    Description: "AthenaQueryToRDSFunction"
+    Value: !GetAtt AthenaQueryToRDSFunction.Arn
+  stageListingSyncLambdaFunction:
+    Description: "StageListingSyncLambdaFunction"
+    Value: !GetAtt StageListingSyncLambdaFunction.Arn
+  mappingBackupFunction:
+    Description: "MappingBackupFunction"
+    Value: !GetAtt MappingBackupFunction.Arn
+  lookupSyncHomelistingtoRDSFunction:
+    Description: "LookupSyncHomelistingtoRDSFunction"
+    Value: !GetAtt LookupSyncHomelistingtoRDSFunction.Arn
+
+  # API Gateway URL
+  ApiGatewayUrl:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${SchedulerApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiGatewayUrl"
+
+  # Cognito User Pool ID
+  UserPoolId:
+    Description: "Cognito User Pool ID"
+    Value: !Ref SchedulerApiUserPool
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolId"
+
+  # Cognito User Pool Client ID
+  UserPoolClientId:
+    Description: "Cognito User Pool Client ID"
+    Value: !Ref SchedulerApiUserPoolClient
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolClientId"
+
+  # Cognito User Pool Domain
+  UserPoolDomain:
+    Description: "Cognito User Pool Domain"
+    Value: !Sub "https://${SchedulerApiUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolDomain"
+
+  # Cognito Hosted UI URL
+  CognitoHostedUIUrl:
+    Description: "Cognito Hosted UI URL for authentication"
+    Value: !Sub |
+      https://${SchedulerApiUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com/login?client_id=${SchedulerApiUserPoolClient}&response_type=code&scope=email+openid+profile&redirect_uri=https://localhost:3000/callback
+    Export:
+      Name: !Sub "${AWS::StackName}-CognitoHostedUIUrl"

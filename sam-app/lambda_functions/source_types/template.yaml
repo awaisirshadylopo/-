@@ -1,0 +1,352 @@
+# ==============================================================================
+# File: source_types -> template.yaml
+# Description: Creation of All Lambdas Specific to the Source Types
+# ==============================================================================
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  securityGroup:
+    Type: String
+
+  subnet1:
+    Type: String
+
+  subnet2:
+    Type: String
+
+  listingDatabase:
+    Type: String
+
+  rdsDatabase:
+    Type: String
+
+  mlsLambdaFunctionRole:
+    Type: String
+
+Resources:
+  TrestleFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: trestle-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  BridgeFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: bridge-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  # AlignedFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: aligned-api/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  ProptxFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: proptx-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+  
+  # CommercialmlsFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: commercialmls-api/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  # ### LISTHUB DEPRECATED
+  ListhubFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: listhub-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  SparkFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: spark-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  ParagonFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: paragon-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  MlsrouterFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: mlsrouter-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  DdfFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: ddf-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  MlsgridFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: mlsgrid-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  ResoFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: reso-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  # SourceREFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: sourcere-api/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  RAPIFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: r-api/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  # RapattoniFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: rapattoni-api/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  # DovetailFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: dovetail-api/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  # ConnectmlsRetsFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: connectmls-rets/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  TrestleRetsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: trestle-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  BrightRetsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: bright-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+  
+  # GSMLSRetsFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: gsmls-rets/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  ParagonrelsRetsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: paragonrels-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  # RapretsRetsFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: raprets-rets/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+  
+  SilvarRetsFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: silvar-rets/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  # NavicamlsRetsFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: navicamls-rets/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  # FlexmlsRetsFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: flexmls-rets/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  # MlsmatrixRetsFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: mlsmatrix-rets/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  # UnifiedRetsFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: unified-rets/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole

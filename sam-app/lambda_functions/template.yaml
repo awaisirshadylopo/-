@@ -1,0 +1,66 @@
+# ==============================================================================
+# File: lambda_functions -> template.yaml
+# Description: Creation of All Lambda Functions
+# ==============================================================================
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  securityGroup:
+    Type: String
+
+  subnet1:
+    Type: String
+
+  subnet2:
+    Type: String
+
+  listingDatabase:
+    Type: String
+
+  rdsDatabase:
+    Type: String
+
+  mlsLambdaFunctionRole:
+    Type: String
+
+Resources:
+  # ###################### Operational Lambdas #########################
+  # OperationalFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: operations/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+  
+  # ###################### MLS Generic Lambdas #########################
+  # MlsFunctions:
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: mls/template.yaml
+  #     Parameters:
+  #       listingDatabase: !Ref listingDatabase
+  #       rdsDatabase: !Ref rdsDatabase
+  #       securityGroup: !Ref securityGroup
+  #       subnet1: !Ref subnet1
+  #       subnet2: !Ref subnet2
+  #       mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole
+
+  ###################### Source Type Specific Lambdas #########################
+  SourceTypeFunctions:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: source_types/template.yaml
+      Parameters:
+        listingDatabase: !Ref listingDatabase
+        rdsDatabase: !Ref rdsDatabase
+        securityGroup: !Ref securityGroup
+        subnet1: !Ref subnet1
+        subnet2: !Ref subnet2
+        mlsLambdaFunctionRole: !Ref mlsLambdaFunctionRole

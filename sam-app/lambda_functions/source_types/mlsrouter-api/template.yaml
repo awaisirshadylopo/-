@@ -1,0 +1,155 @@
+# ==============================================================================
+# File: mlsrouter-api -> template.yaml
+# Description: Creation of MLSRouter API Specific Lambda Functions
+# ==============================================================================
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  securityGroup:
+    Type: String
+
+  subnet1:
+    Type: String
+
+  subnet2:
+    Type: String
+
+  listingDatabase:
+    Type: String
+
+  rdsDatabase:
+    Type: String
+
+  mlsLambdaFunctionRole:
+    Type: String
+
+
+Resources:
+  MLSRouterActiveDataDownloadLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mlsrouter-active-data-download-func
+      Handler: app.lambda_handler
+      FunctionName: mlsrouter-active-data-download-func
+      Description: "This lambda fetches data from source and dumps into DB"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          bucket_name: !Sub idx-data-lake-${AWS::AccountId}-${AWS::Region}
+          sqlExecLimit: 900000
+
+  MLSRouterActiveDataDownloadLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${MLSRouterActiveDataDownloadLambdaFunction}"
+      RetentionInDays: 90
+
+  MLSRouterInactiveDataDownloadLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mlsrouter-inactive-data-download-func
+      Handler: app.lambda_handler
+      FunctionName: mlsrouter-inactive-data-download-func
+      Description: "This lambda fetches all active data from source and dumps into DB"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  MLSRouterInactiveDataDownloadLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${MLSRouterInactiveDataDownloadLambdaFunction}"
+      RetentionInDays: 90
+
+  MLSRouterOpenHouseDownloadUtilityLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mlsrouter-openhouse-download-utility-func
+      Handler: app.lambda_handler
+      # FunctionName: mlsrouter-openhouse-download-utility-func
+      FunctionName: mlsrouter-inactive-openhouse-download-func
+      Description: "This lambda fetches valid openhouse records from source and dumps into DB"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  MLSRouterOpenHouseDownloadUtilityLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${MLSRouterOpenHouseDownloadUtilityLambdaFunction}"
+      RetentionInDays: 90
+
+  MLSRouterMetadataDownloadLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mlsrouter-metadata-download-func
+      Handler: app.lambda_handler
+      FunctionName: mlsrouter-metadata-download-func
+      Description: "This lambda fetches metadata from source and dumps into metadata tables"
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  MLSRouterMetadataDownloadLambdaFunctionlogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${MLSRouterMetadataDownloadLambdaFunction}"
+      RetentionInDays: 90

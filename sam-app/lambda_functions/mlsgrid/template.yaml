@@ -1,0 +1,75 @@
+# ==============================================================================
+# File: template.yaml
+# Description: Creation of Mlsgrid Specific Lambda Functions
+# Author: msanaullah
+# Last Updated: 2025-01-15
+# ==============================================================================
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  securityGroup:
+    Type: String
+
+  subnet1:
+    Type: String
+
+  subnet2:
+    Type: String
+
+  listingDatabase:
+    Type: String
+
+  rdsDatabase:
+    Type: String
+
+  mlsLambdaFunctionRole:
+    Type: String
+
+  awsWrangler:
+    Type: String
+
+  psycopg2:
+    Type: String
+
+  helperLayer:
+    Type: String
+
+  requests:
+    Type: String
+
+Resources:
+  MlsgridDataDownloadingLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: mlsgrid-active-data-download-func
+      Handler: app.lambda_handler
+      FunctionName: mlsgrid-active-data-download-func
+      Description: "This lambda downloads data from the source and dumps it into pre-stage tables."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 1024
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+          bucket_name: !Sub idx-data-lake-${AWS::AccountId}-${AWS::Region}
+  MlsgridDataDownloadingLambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: MlsgridDataDownloadingLambdaFunction
+    Properties:
+      LogGroupName:
+        !Join ["", ["/aws/lambda/", !Ref MlsgridDataDownloadingLambdaFunction]]
+      RetentionInDays: 90

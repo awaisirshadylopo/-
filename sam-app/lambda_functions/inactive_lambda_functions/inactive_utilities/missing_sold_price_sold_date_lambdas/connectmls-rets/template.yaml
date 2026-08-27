@@ -1,0 +1,63 @@
+
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  securityGroup:
+    Type: String
+
+  subnet1:
+    Type: String
+
+  subnet2:
+    Type: String
+
+  listingDatabase:
+    Type: String
+
+  rdsDatabase:
+    Type: String
+
+  mlsLambdaFunctionRole:
+    Type: String
+
+Resources:
+  ConnectMlsRetsMissingSoldDateUtilityFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: connectmls-rets-missing-sold-date-utility-func
+      Handler: app.lambda_handler
+      FunctionName: connectmls-rets-missing-sold-date-utility-func
+      Description: "This Lambda function download and update missing sold_date and sold_price fields in the database."
+      Runtime: python3.12
+      Timeout: 900
+      MemorySize: 256
+      Role: !Ref mlsLambdaFunctionRole
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref securityGroup
+        SubnetIds:
+          - !Ref subnet1
+          - !Ref subnet2
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:16"
+        - !Sub "arn:aws:lambda:${AWS::Region}:770693421928:layer:Klayers-p312-psycopg2-binary:1"
+
+      Environment:
+        Variables:
+          listingDatabase: !Ref listingDatabase
+          rdsDatabase: !Ref rdsDatabase
+
+  ConnectMlsRetsMissingSoldDateUtilityFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: ConnectMlsRetsMissingSoldDateUtilityFunction
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ConnectMlsRetsMissingSoldDateUtilityFunction}"
+      RetentionInDays: 90
+
+
+Outputs:
+
+  ConnectMlsRetsMissingSoldDateUtilityFunction:
+    Description: "ConnectMlsRetsMissingSoldDateUtilityFunction"
+    Value: !GetAtt ConnectMlsRetsMissingSoldDateUtilityFunction.Arn

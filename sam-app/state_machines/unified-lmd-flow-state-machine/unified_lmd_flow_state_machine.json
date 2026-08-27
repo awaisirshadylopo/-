@@ -1,0 +1,760 @@
+{
+	"Comment": "A description of my state machine",
+	"StartAt": "Locking Lambda",
+	"States": {
+		"Locking Lambda": {
+			"Type": "Task",
+			"Resource": "arn:aws:states:::lambda:invoke",
+			"OutputPath": "$.Payload",
+			"Parameters": {
+				"Payload.$": "$",
+				"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-active-unified-locking-func:$LATEST"
+			},
+			"Retry": [
+				{
+					"ErrorEquals": [
+						"Lambda.ServiceException",
+						"Lambda.AWSLambdaException",
+						"Lambda.SdkClientException",
+						"Lambda.TooManyRequestsException"
+					],
+					"IntervalSeconds": 1,
+					"MaxAttempts": 3,
+					"BackoffRate": 2
+				}
+			],
+			"Next": "Filter Locked IDs"
+		},
+		"Filter Locked IDs": {
+			"Type": "Choice",
+			"Choices": [
+				{
+					"Variable": "$.flow",
+					"BooleanEquals": false,
+					"Next": "No ID Locked"
+				}
+			],
+			"Default": "Stage Data Delete"
+		},
+		"No ID Locked": {
+			"Type": "Pass",
+			"Result": {
+				"Message": "No ID locked"
+			},
+			"End": true
+		},
+		"Stage Data Delete": {
+			"Type": "Task",
+			"Resource": "arn:aws:states:::lambda:invoke",
+			"OutputPath": "$.Payload",
+			"Parameters": {
+				"Payload.$": "$",
+				"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-active-delete-staging-data-func:$LATEST"
+			},
+			"Retry": [
+				{
+					"ErrorEquals": [
+						"Lambda.ServiceException",
+						"Lambda.AWSLambdaException",
+						"Lambda.SdkClientException",
+						"Lambda.TooManyRequestsException"
+					],
+					"IntervalSeconds": 1,
+					"MaxAttempts": 3,
+					"BackoffRate": 2,
+					"JitterStrategy": "FULL"
+				}
+			],
+			"Catch": [
+				{
+					"ErrorEquals": [
+						"States.ALL"
+					],
+					"Next": "Released Lock ID",
+					"ResultPath": "$.Payload"
+				}
+			],
+			"Next": "Creating Multiple Iteration"
+		},
+		"Released Lock ID": {
+			"Type": "Task",
+			"Resource": "arn:aws:states:::lambda:invoke",
+			"OutputPath": "$.Payload",
+			"Parameters": {
+				"Payload.$": "$",
+				"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-active-unlocking-func:$LATEST"
+			},
+			"Retry": [
+				{
+					"ErrorEquals": [
+						"Lambda.ServiceException",
+						"Lambda.AWSLambdaException",
+						"Lambda.SdkClientException",
+						"Lambda.TooManyRequestsException"
+					],
+					"IntervalSeconds": 1,
+					"MaxAttempts": 3,
+					"BackoffRate": 2,
+					"JitterStrategy": "FULL"
+				}
+			],
+			"End": true
+		},
+		"Creating Multiple Iteration": {
+			"Type": "Map",
+			"ItemProcessor": {
+				"ProcessorConfig": {
+					"Mode": "DISTRIBUTED",
+					"ExecutionType": "STANDARD"
+				},
+				"StartAt": "Validation Lambda",
+				"States": {
+					"Validation Lambda": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::lambda:invoke",
+						"Parameters": {
+							"Payload.$": "$",
+							"FunctionName.$": "States.Format('arn:aws:lambda:${awsRegion}:${awsAccountId}:function:{}-active-data-download-func:$LATEST', $.source_info.func_name)"
+						},
+						"Retry": [
+							{
+								"ErrorEquals": [
+									"Lambda.ServiceException",
+									"Lambda.AWSLambdaException",
+									"Lambda.SdkClientException",
+									"Lambda.TooManyRequestsException"
+								],
+								"IntervalSeconds": 1,
+								"MaxAttempts": 3,
+								"BackoffRate": 2
+							}
+						],
+						"Catch": [
+							{
+								"ErrorEquals": [
+									"States.ALL"
+								],
+								"Next": "Executing Rest of Failed Flow",
+								"ResultPath": "$.Payload"
+							}
+						],
+						"Next": "ETL Batch Type Lambda",
+						"OutputPath": "$.Payload"
+					},
+					"ETL Batch Type Lambda": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::lambda:invoke",
+						"OutputPath": "$.Payload",
+						"Parameters": {
+							"Payload.$": "$",
+							"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-active-etl-batch-type-func:$LATEST"
+						},
+						"Retry": [
+							{
+								"ErrorEquals": [
+									"Lambda.ServiceException",
+									"Lambda.AWSLambdaException",
+									"Lambda.SdkClientException",
+									"Lambda.TooManyRequestsException"
+								],
+								"IntervalSeconds": 1,
+								"MaxAttempts": 3,
+								"BackoffRate": 2
+							}
+						],
+						"Catch": [
+							{
+								"ErrorEquals": [
+									"States.ALL"
+								],
+								"Next": "Executing Rest of Failed Flow",
+								"ResultPath": "$.Payload"
+							}
+						],
+						"Next": "Filtering Failed Validation"
+					},
+					"Filtering Failed Validation": {
+						"Type": "Choice",
+						"Choices": [
+						{
+							"Variable": "$.batch_initialized",
+							"IsPresent": false,
+							"Next": "Executing Rest of Failed Flow"
+						},
+						{
+							"Variable": "$.batch_initialized",
+							"BooleanEquals": false,
+							"Next": "No insert update ETL actions"
+						},
+						{
+							"Next": "Glue Partition Register",
+							"And": [
+							{
+								"Variable": "$.scan_s3_flag",
+								"BooleanEquals": true
+							},
+							{
+								"Variable": "$.respecs_flag",
+								"BooleanEquals": true
+							}
+							]
+						}
+						],
+						"Default": "Data Download Lambda"
+					},
+					"No insert update ETL actions": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::lambda:invoke",
+						"OutputPath": "$.Payload",
+						"Parameters": {
+							"Payload.$": "$",
+							"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-active-no-insert-update-func:$LATEST"
+						},
+						"Retry": [
+							{
+								"ErrorEquals": [
+									"Lambda.ServiceException",
+									"Lambda.AWSLambdaException",
+									"Lambda.SdkClientException",
+									"Lambda.TooManyRequestsException"
+								],
+								"IntervalSeconds": 1,
+								"MaxAttempts": 3,
+								"BackoffRate": 2
+							}
+						],
+						"Next": "Executing Rest of Failed Flow"
+					},
+					"Data Download Lambda": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::lambda:invoke",
+						"OutputPath": "$.Payload",
+						"Parameters": {
+							"Payload.$": "$",
+							"FunctionName.$": "States.Format('arn:aws:lambda:${awsRegion}:${awsAccountId}:function:{}-active-data-download-func:$LATEST', $.source_info.func_name)"
+						},
+						"Retry": [
+							{
+								"ErrorEquals": [
+									"Lambda.ServiceException",
+									"Lambda.AWSLambdaException",
+									"Lambda.SdkClientException",
+									"Lambda.TooManyRequestsException"
+								],
+								"IntervalSeconds": 1,
+								"MaxAttempts": 3,
+								"BackoffRate": 2
+							}
+						],
+						"Catch": [
+							{
+								"ErrorEquals": [
+									"States.ALL"
+								],
+								"Next": "Executing Rest of Failed Flow",
+								"ResultPath": "$.Payload"
+							}
+						],
+						"Next": "Filtering Failed Downloads"
+					},
+					"Filtering Failed Downloads": {
+						"Type": "Choice",
+						"Choices": [
+							{
+								"Variable": "$.status",
+								"IsPresent": false,
+								"Next": "Executing Rest of Failed Flow"
+							},
+							{
+								"And": [
+									{
+										"Variable": "$.status",
+										"BooleanEquals": true
+									}
+								],
+								"Next": "Prestage to Generic Mappings Insertions"
+							}
+						],
+						"Default": "Executing Rest of Failed Flow"
+					},
+					"Executing Rest of Failed Flow": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::lambda:invoke",
+						"Parameters": {
+							"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-active-unlocking-func:$LATEST",
+							"Payload": {
+								"executionArn.$": "$$.Execution.Id",
+								"originalPayload.$": "$"
+							}
+						},
+						"Retry": [
+							{
+								"ErrorEquals": [
+									"Lambda.ServiceException",
+									"Lambda.AWSLambdaException",
+									"Lambda.SdkClientException",
+									"Lambda.TooManyRequestsException"
+								],
+								"IntervalSeconds": 1,
+								"MaxAttempts": 3,
+								"BackoffRate": 2
+							}
+						],
+						"End": true,
+						"OutputPath": "$.Payload"
+					},
+					"Prestage to Generic Mappings Insertions": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::lambda:invoke",
+						"OutputPath": "$.Payload",
+						"Parameters": {
+							"Payload.$": "$",
+							"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-active-mapping-func:$LATEST"
+						},
+						"Retry": [
+							{
+								"ErrorEquals": [
+									"Lambda.ServiceException",
+									"Lambda.AWSLambdaException",
+									"Lambda.SdkClientException",
+									"Lambda.TooManyRequestsException"
+								],
+								"IntervalSeconds": 1,
+								"MaxAttempts": 3,
+								"BackoffRate": 2
+							}
+						],
+						"Catch": [
+							{
+								"ErrorEquals": [
+									"States.ALL"
+								],
+								"Next": "Executing Rest of Failed Flow",
+								"ResultPath": "$.Payload"
+							}
+						],
+						"Next": "Filter Prestage to Generic  Successful Insertion"
+					},
+					"Filter Prestage to Generic  Successful Insertion": {
+						"Type": "Choice",
+						"Choices": [
+							{
+								"Variable": "$.status",
+								"IsPresent": false,
+								"Next": "Executing Rest of Failed Flow"
+							},
+							{
+								"And": [
+									{
+										"Variable": "$.status",
+										"BooleanEquals": true
+									},
+									{
+										"Not": {
+											"Variable": "$.flow_type",
+											"StringEquals": "respecs"
+										}
+									}
+								],
+								"Next": "ETL Actions"
+							},
+							{
+								"And": [
+									{
+										"Variable": "$.status",
+										"BooleanEquals": true
+									},
+									{
+										"Variable": "$.flow_type",
+										"StringEquals": "respecs"
+									}
+								],
+								"Next": "Stage to Listing Migration"
+							}
+						],
+						"Default": "Executing Rest of Failed Flow"
+					},
+					"ETL Actions": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::lambda:invoke",
+						"OutputPath": "$.Payload",
+						"Parameters": {
+							"Payload.$": "$",
+							"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-active-etl-action-func:$LATEST"
+						},
+						"Retry": [
+							{
+								"ErrorEquals": [
+									"Lambda.ServiceException",
+									"Lambda.AWSLambdaException",
+									"Lambda.SdkClientException",
+									"Lambda.TooManyRequestsException"
+								],
+								"IntervalSeconds": 1,
+								"MaxAttempts": 3,
+								"BackoffRate": 2
+							}
+						],
+						"Catch": [
+							{
+								"ErrorEquals": [
+									"States.ALL"
+								],
+								"Next": "Executing Rest of Failed Flow",
+								"ResultPath": "$.Payload"
+							}
+						],
+						"Next": "Filter  Successful  ETL Actions"
+					},
+					"Filter  Successful  ETL Actions": {
+						"Type": "Choice",
+						"Choices": [
+							{
+								"Variable": "$.status",
+								"IsPresent": false,
+								"Next": "Executing Rest of Failed Flow"
+							},
+							{
+								"Variable": "$.status",
+								"BooleanEquals": true,
+								"Next": "Data Sync"
+							}
+						],
+						"Default": "Executing Rest of Failed Flow"
+					},
+					"Data Sync": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::lambda:invoke",
+						"OutputPath": "$.Payload",
+						"Parameters": {
+							"Payload.$": "$",
+							"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-active-data-sync-func:$LATEST"
+						},
+						"Retry": [
+							{
+								"ErrorEquals": [
+									"Lambda.ServiceException",
+									"Lambda.AWSLambdaException",
+									"Lambda.SdkClientException",
+									"Lambda.TooManyRequestsException"
+								],
+								"IntervalSeconds": 1,
+								"MaxAttempts": 3,
+								"BackoffRate": 2
+							}
+						],
+						"Catch": [
+							{
+								"ErrorEquals": [
+									"States.ALL"
+								],
+								"Next": "Executing Rest of Failed Flow",
+								"ResultPath": "$.Payload"
+							}
+						],
+						"Next": "Filter  Successful  DataSync"
+					},
+					"Filter  Successful  DataSync": {
+						"Type": "Choice",
+						"Choices": [
+							{
+								"Variable": "$[0].success",
+								"IsPresent": false,
+								"Next": "Executing Rest of Failed Flow"
+							},
+							{
+								"Variable": "$[0].success",
+								"BooleanEquals": true,
+								"Next": "Data Quality Manager Func"
+							}
+						],
+						"Default": "Executing Rest of Failed Flow"
+					},
+					"Data Quality Manager Func": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::lambda:invoke",
+						"OutputPath": "$.Payload",
+						"Parameters": {
+							"Payload.$": "$",
+							"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-active-data-quality-manager-func:$LATEST"
+						},
+						"Retry": [
+							{
+								"ErrorEquals": [
+									"Lambda.ServiceException",
+									"Lambda.AWSLambdaException",
+									"Lambda.SdkClientException",
+									"Lambda.TooManyRequestsException"
+								],
+								"IntervalSeconds": 1,
+								"MaxAttempts": 3,
+								"BackoffRate": 2
+							}
+						],
+						"Next": "Filter Data Quality Manager Execution",
+						"Catch": [
+							{
+								"ErrorEquals": [
+									"States.ALL"
+								],
+								"Next": "Executing Rest of Failed Flow",
+								"ResultPath": "$.Payload"
+							}
+						]
+					},
+					"Filter Data Quality Manager Execution": {
+						"Type": "Choice",
+						"Choices": [
+							{
+								"Variable": "$[0].status",
+								"BooleanEquals": true,
+								"Next": "Cache Clean"
+							},
+							{
+								"Or": [
+									{
+										"Variable": "$[0].status",
+										"IsPresent": false
+									},
+									{
+										"Variable": "$[0].status",
+										"BooleanEquals": false
+									}
+								],
+								"Next": "Executing Rest of Failed Flow"
+							}
+						],
+						"Default": "Executing Rest of Failed Flow"
+					},
+					"Cache Clean": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::lambda:invoke",
+						"OutputPath": "$.Payload",
+						"Parameters": {
+							"Payload.$": "$",
+							"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-cache-clean-func:$LATEST"
+						},
+						"Retry": [
+							{
+								"ErrorEquals": [
+									"Lambda.ServiceException",
+									"Lambda.AWSLambdaException",
+									"Lambda.SdkClientException",
+									"Lambda.TooManyRequestsException"
+								],
+								"IntervalSeconds": 1,
+								"MaxAttempts": 3,
+								"BackoffRate": 2
+							}
+						],
+						"Catch": [
+							{
+								"ErrorEquals": [
+									"States.ALL"
+								],
+								"Next": "Executing Rest of Failed Flow",
+								"ResultPath": "$.Payload"
+							}
+						],
+						"Next": "Unlocking Rest of the flow ids"
+					},
+					"Unlocking Rest of the flow ids": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::lambda:invoke",
+						"OutputPath": "$.Payload",
+						"Parameters": {
+							"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-active-unlocking-func:$LATEST",
+							"Payload": {
+								"executionArn.$": "$$.Execution.Id",
+								"originalPayload.$": "$"
+							}
+						},
+						"Retry": [
+							{
+								"ErrorEquals": [
+									"Lambda.ServiceException",
+									"Lambda.AWSLambdaException",
+									"Lambda.SdkClientException",
+									"Lambda.TooManyRequestsException"
+								],
+								"IntervalSeconds": 1,
+								"MaxAttempts": 3,
+								"BackoffRate": 2
+							}
+						],
+						"Catch": [
+							{
+								"ErrorEquals": [
+									"States.ALL"
+								],
+								"Next": "Executing Rest of Failed Flow",
+								"ResultPath": "$.Payload"
+							}
+						],
+						"End": true
+					},
+					"Stage to Listing Migration": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::lambda:invoke",
+						"OutputPath": "$.Payload",
+						"Parameters": {
+							"Payload.$": "$",
+							"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-active-stage-listing-migration-func:$LATEST"
+						},
+						"Retry": [
+							{
+								"ErrorEquals": [
+									"Lambda.ServiceException",
+									"Lambda.AWSLambdaException",
+									"Lambda.SdkClientException",
+									"Lambda.TooManyRequestsException"
+								],
+								"IntervalSeconds": 1,
+								"MaxAttempts": 3,
+								"BackoffRate": 2,
+								"JitterStrategy": "FULL"
+							}
+						],
+						"Next": "Unlocking Rest of the flow ids"
+                        },
+					"Glue Partition Register": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::lambda:invoke",
+						"OutputPath": "$.Payload",
+						"Parameters": {
+						"Payload.$": "$",
+						"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-s3-glue-partition-scan-func"
+						},
+						"Retry": [
+						{
+							"ErrorEquals": [
+							"Lambda.ServiceException",
+							"Lambda.AWSLambdaException",
+							"Lambda.SdkClientException",
+							"Lambda.TooManyRequestsException"
+							],
+							"IntervalSeconds": 1,
+							"MaxAttempts": 3,
+							"BackoffRate": 2,
+							"JitterStrategy": "FULL"
+						}
+						],
+						"Catch": [
+						{
+							"ErrorEquals": [
+							"States.ALL"
+							],
+							"Next": "Executing Rest of Failed Flow",
+							"ResultPath": "$.Payload"
+						}
+						],
+						"Next": "Choice"
+					},
+					"Choice": {
+						"Type": "Choice",
+						"Choices": [
+						{
+							"Next": "Glue Partition Register",
+							"Variable": "$.scan_status",
+							"StringMatches": "incomplete"
+						},
+						{
+							"Next": "Athena Query to RDS",
+							"Not": {
+							"Variable": "$.scan_status",
+							"StringMatches": "incomplete"
+							}
+						}
+						]
+					},
+				"Athena Query to RDS": {
+					"Type": "Task",
+					"Resource": "arn:aws:states:::lambda:invoke",
+					"OutputPath": "$.Payload",
+					"Parameters": {
+					"Payload.$": "$",
+					"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-athena-query-to-rds-func"
+					},
+					"Catch": [
+					{
+						"ErrorEquals": [
+						"States.ALL"
+						],
+						"Next": "Executing Rest of Failed Flow",
+						"ResultPath": "$.Payload"
+					}
+					],
+					"Next": "Wait For Athena"
+				},
+				"Wait For Athena": {
+					"Type": "Wait",
+					"Seconds": 30,
+					"Next": "Check Athena Status"
+				},
+				"Check Athena Status": {
+					"Type": "Task",
+					"Resource": "arn:aws:states:::lambda:invoke",
+					"OutputPath": "$.Payload",
+					"Parameters": {
+					"Payload.$": "$",
+					"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-athena-query-to-rds-func"
+					},
+					"Catch": [
+					{
+						"ErrorEquals": [
+						"States.ALL"
+						],
+						"Next": "Executing Rest of Failed Flow",
+						"ResultPath": "$.Payload"
+					}
+					],
+					"Next": "Is Athena Complete"
+				},
+				"Is Athena Complete": {
+					"Type": "Choice",
+					"Choices": [
+					{
+						"Variable": "$.athena_status",
+						"StringEquals": "SUCCEEDED",
+						"Next": "Load RDS"
+					},
+					{
+						"Variable": "$.athena_status",
+						"StringEquals": "FAILED",
+						"Next": "Executing Rest of Failed Flow"
+					},
+					{
+						"Variable": "$.athena_status",
+						"StringEquals": "CANCELLED",
+						"Next": "Executing Rest of Failed Flow"
+					}
+					],
+					"Default": "Wait For Athena"
+				},
+				"Load RDS": {
+					"Type": "Task",
+					"Resource": "arn:aws:states:::lambda:invoke",
+					"OutputPath": "$.Payload",
+					"Parameters": {
+					"Payload.$": "$",
+					"FunctionName": "arn:aws:lambda:${awsRegion}:${awsAccountId}:function:mls-athena-query-to-rds-func"
+					},
+					"Catch": [
+					{
+						"ErrorEquals": [
+						"States.ALL"
+						],
+						"Next": "Executing Rest of Failed Flow",
+						"ResultPath": "$.Payload"
+					}
+					],
+					"Next": "Prestage to Generic Mappings Insertions"
+					}
+				}
+			},
+			"End": true,
+			"Label": "CreatingMultipleIteration",
+			"MaxConcurrency": 1000
+		}
+	}
+}
