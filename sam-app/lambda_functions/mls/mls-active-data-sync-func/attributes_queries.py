@@ -4626,6 +4626,7 @@ string_to_array(nullif(TRIM(TRIM(TRIM(REPLACE(REPLACE(REPLACE(compensation_comme
 ,sold_price_per_sqft
 ,is_not_condo_timeshare
 ,in_use_shortterm_rental
+,has_sauna
 
 from stage.direct_idx_attribute_3 s
 join stage.etl_direct_idx_insert_listings t
